@@ -1,0 +1,536 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// MASTER DATA
+// ============================================================================
+
+model Item {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  description String
+  type        ItemType
+  unitOfMeasure String
+  standardCycleTime Float? // minutes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bomComponents BillOfMaterial[] @relation("ParentItem")
+  bomUsages     BillOfMaterial[] @relation("ComponentItem")
+  lots          Lot[]
+  productionOrders ProductionOrder[]
+  routings      Routing[] @relation("ItemRoutings")
+  @@index([code])
+  @@index([type])
+  @@map("items")
+}
+
+enum ItemType {
+  RAW_MATERIAL
+  WIP
+  FINISHED_GOOD
+  COMPONENT
+}
+
+model BillOfMaterial {
+  id            String @id @default(uuid())
+  parentItemId  String
+  componentItemId String
+  quantity      Float
+  sequence      Int?
+  createdAt     DateTime @default(now())
+
+  parentItem    Item @relation("ParentItem", fields: [parentItemId], references: [id])
+  componentItem Item @relation("ComponentItem", fields: [componentItemId], references: [id])
+
+  @@unique([parentItemId, componentItemId])
+  @@index([parentItemId])
+  @@map("bill_of_materials")
+}
+
+model ProcessStep {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  sequence    Int
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  routingSteps      RoutingStep[]
+  executionEvents   ExecutionEvent[]
+  processExecutions ProcessExecution[]
+  qualityRecords    QualityRecord[]
+
+  @@index([code])
+  @@index([sequence])
+  @@map("process_steps")
+}
+
+model Routing {
+  id        String   @id @default(uuid())
+  itemId    String
+  version   Int      @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item  Item          @relation("ItemRoutings", fields: [itemId], references: [id])
+  steps RoutingStep[]
+
+  @@unique([itemId, version])
+  @@index([itemId, isActive])
+  @@map("routings")
+}
+
+model RoutingStep {
+  id            String @id @default(uuid())
+  routingId     String
+  processStepId String
+  sequence      Int
+  workcenterId  String?
+  setupTime     Float? // minutes
+  runTime       Float? // minutes per piece
+
+  routing     Routing      @relation("ItemRoutings", fields: [routingId], references: [id])
+  processStep ProcessStep  @relation(fields: [processStepId], references: [id])
+  workcenter  Workcenter?  @relation(fields: [workcenterId], references: [id])
+
+  @@unique([routingId, sequence])
+  @@index([routingId])
+  @@map("routing_steps")
+}
+
+model Workcenter {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  type        WorkcenterType
+  isEnabled   Boolean  @default(true)
+  capacity    Int?     // For tables/stations
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  routingSteps      RoutingStep[]
+  executionEvents   ExecutionEvent[]
+  processExecutions ProcessExecution[]
+  downtimeEvents    DowntimeEvent[]
+  shiftSchedules    ShiftSchedule[]
+  workcenterCalendars WorkcenterCalendar[]
+  approvals         Approval[]
+  oeeSnapshots      OEESnapshot[]
+  tableUtilizations TableUtilization[]
+
+  @@index([code])
+  @@index([isEnabled])
+  @@map("workcenters")
+}
+
+enum WorkcenterType {
+  OPTIMIZER
+  PRE_CUT
+  CNC
+  FINISHING
+  ASSEMBLY
+  PAINTING
+  PACKAGING
+  PRESS
+  CALIBRATOR
+  BRUSH
+}
+
+model Operator {
+  id        String   @id @default(uuid())
+  badge     String   @unique
+  name      String
+  role      OperatorRole
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  executionEvents   ExecutionEvent[]
+  processExecutions ProcessExecution[]
+  approvalsRequested Approval[] @relation("RequestedBy")
+  approvalsApproved  Approval[] @relation("ApprovedBy")
+
+  @@index([badge])
+  @@index([role])
+  @@map("operators")
+}
+
+enum OperatorRole {
+  OPERATOR
+  SUPERVISOR
+  PCP
+  MANAGER
+}
+
+// ============================================================================
+// PRODUCTION ORDERS & LOTS
+// ============================================================================
+
+model ProductionOrder {
+  id               String   @id @default(uuid())
+  erpOrderCode     String   @unique
+  type             OrderType
+  status           OrderStatus
+  itemId           String
+  plannedQty       Float
+  executedGoodQty  Float    @default(0)
+  executedTotalQty Float    @default(0)
+  dueDate          DateTime
+  priority         Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  item              Item               @relation(fields: [itemId], references: [id])
+  lots              Lot[]
+  executionEvents   ExecutionEvent[]
+  processExecutions ProcessExecution[]
+  qualityRecords    QualityRecord[]
+  replenishmentLinks ReplenishmentLink[] @relation("OriginalOrder")
+  replenishmentSources ReplenishmentLink[] @relation("ReplenishmentOrder")
+
+  @@index([erpOrderCode])
+  @@index([status])
+  @@index([type])
+  @@index([dueDate])
+  @@map("production_orders")
+}
+
+enum OrderType {
+  PRODUCTION
+  REPLENISHMENT
+}
+
+enum OrderStatus {
+  OPEN_NOT_STARTED
+  IN_PROGRESS
+  OPEN_PARTIAL
+  CLOSED
+}
+
+model Lot {
+  id        String   @id @default(uuid())
+  lotCode   String   @unique
+  itemId    String
+  productionOrderId String?
+  origin    LotOrigin
+  quantity  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item              Item             @relation(fields: [itemId], references: [id])
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [id])
+  executionEvents   ExecutionEvent[]
+  qualityRecords    QualityRecord[]
+  parentGenealogy   LotGenealogy[]   @relation("ParentLot")
+  childGenealogy    LotGenealogy[]   @relation("ChildLot")
+
+  @@index([lotCode])
+  @@index([productionOrderId])
+  @@map("lots")
+}
+
+enum LotOrigin {
+  RAW
+  WIP
+  FINISHED
+}
+
+model LotGenealogy {
+  id          String   @id @default(uuid())
+  parentLotId String
+  childLotId  String
+  quantity    Float
+  createdAt   DateTime @default(now())
+
+  parentLot Lot @relation("ParentLot", fields: [parentLotId], references: [id])
+  childLot  Lot @relation("ChildLot", fields: [childLotId], references: [id])
+
+  @@unique([parentLotId, childLotId])
+  @@index([parentLotId])
+  @@index([childLotId])
+  @@map("lot_genealogy")
+}
+
+// ============================================================================
+// EXECUTION & EVENTS
+// ============================================================================
+
+model ExecutionEvent {
+  id                String    @id @default(uuid())
+  eventType         EventType
+  productionOrderId String
+  lotId             String?
+  processStepId     String
+  workcenterId      String
+  operatorId        String
+  ts                DateTime  @default(now())
+  payload           Json?
+  idempotencyKey    String?   @unique
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id])
+  lot             Lot?            @relation(fields: [lotId], references: [id])
+  processStep     ProcessStep     @relation(fields: [processStepId], references: [id])
+  workcenter      Workcenter      @relation(fields: [workcenterId], references: [id])
+  operator        Operator        @relation(fields: [operatorId], references: [id])
+
+  @@index([productionOrderId, processStepId, workcenterId])
+  @@index([ts])
+  @@index([eventType])
+  @@index([idempotencyKey])
+  @@map("execution_events")
+}
+
+enum EventType {
+  SCAN
+  START
+  STOP
+  COUNT
+  QUALITY
+  COMPLETE
+}
+
+model ProcessExecution {
+  id                String    @id @default(uuid())
+  productionOrderId String
+  processStepId     String
+  workcenterId      String
+  operatorId        String?
+  status            ExecutionStatus
+  startedAt         DateTime?
+  completedAt       DateTime?
+  plannedQty        Float
+  executedQty       Float     @default(0)
+  goodQty           Float     @default(0)
+  scrapQty          Float     @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id])
+  processStep     ProcessStep     @relation(fields: [processStepId], references: [id])
+  workcenter      Workcenter      @relation(fields: [workcenterId], references: [id])
+  operator        Operator?       @relation(fields: [operatorId], references: [id])
+
+  @@unique([productionOrderId, processStepId, workcenterId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("process_executions")
+}
+
+enum ExecutionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  PAUSED
+}
+
+// ============================================================================
+// QUALITY
+// ============================================================================
+
+model QualityRecord {
+  id                String          @id @default(uuid())
+  productionOrderId String
+  lotId             String
+  processStepId     String
+  disposition       QualityDisposition
+  reasonCode        String
+  qty               Float
+  ts                DateTime        @default(now())
+  notes             String?
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id])
+  lot             Lot             @relation(fields: [lotId], references: [id])
+  processStep     ProcessStep     @relation(fields: [processStepId], references: [id])
+
+  @@index([productionOrderId])
+  @@index([disposition])
+  @@index([ts])
+  @@map("quality_records")
+}
+
+enum QualityDisposition {
+  SCRAP_NO_REUSE
+  REUSE
+}
+
+// ============================================================================
+// DOWNTIME & AVAILABILITY
+// ============================================================================
+
+model DowntimeEvent {
+  id           String    @id @default(uuid())
+  workcenterId String
+  reasonCode   String
+  startTs      DateTime
+  endTs        DateTime?
+  isMicroStop  Boolean   @default(false)
+  notes        String?
+
+  workcenter Workcenter @relation(fields: [workcenterId], references: [id])
+
+  @@index([workcenterId])
+  @@index([startTs])
+  @@index([isMicroStop])
+  @@map("downtime_events")
+}
+
+model ShiftSchedule {
+  id           String   @id @default(uuid())
+  workcenterId String
+  dayOfWeek    Int      // 0=Sunday, 6=Saturday
+  shiftNumber  Int      // 1, 2, 3
+  startTime    String   // HH:mm format
+  endTime      String   // HH:mm format
+  isActive     Boolean  @default(true)
+
+  workcenter Workcenter @relation(fields: [workcenterId], references: [id])
+
+  @@unique([workcenterId, dayOfWeek, shiftNumber])
+  @@index([workcenterId])
+  @@map("shift_schedules")
+}
+
+model WorkcenterCalendar {
+  id           String   @id @default(uuid())
+  workcenterId String
+  date         DateTime @db.Date
+  isAvailable  Boolean  @default(true)
+  reason       String?  // Holiday, maintenance, etc.
+
+  workcenter Workcenter @relation(fields: [workcenterId], references: [id])
+
+  @@unique([workcenterId, date])
+  @@index([workcenterId, date])
+  @@map("workcenter_calendars")
+}
+
+// ============================================================================
+// APPROVALS & GOVERNANCE
+// ============================================================================
+
+model Approval {
+  id             String         @id @default(uuid())
+  type           ApprovalType
+  requestedById  String
+  approvedById   String?
+  workcenterId   String?
+  status         ApprovalStatus
+  justification  String
+  requestedAt    DateTime       @default(now())
+  respondedAt    DateTime?
+  metadata       Json?
+
+  requestedBy Operator    @relation("RequestedBy", fields: [requestedById], references: [id])
+  approvedBy  Operator?   @relation("ApprovedBy", fields: [approvedById], references: [id])
+  workcenter  Workcenter? @relation(fields: [workcenterId], references: [id])
+
+  @@index([status])
+  @@index([type])
+  @@index([requestedAt])
+  @@map("approvals")
+}
+
+enum ApprovalType {
+  OVERTIME
+  ENABLE_EQUIPMENT
+  DISABLE_EQUIPMENT
+  SPECIAL_OPERATION
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================================
+// REPLENISHMENT
+// ============================================================================
+
+model ReplenishmentLink {
+  id                        String   @id @default(uuid())
+  originalProductionOrderId String
+  replenishmentOrderId      String
+  trigger                   String   // SCRAP, DIVERGENCE, etc.
+  createdAt                 DateTime @default(now())
+
+  originalOrder      ProductionOrder @relation("OriginalOrder", fields: [originalProductionOrderId], references: [id])
+  replenishmentOrder ProductionOrder @relation("ReplenishmentOrder", fields: [replenishmentOrderId], references: [id])
+
+  @@index([originalProductionOrderId])
+  @@index([replenishmentOrderId])
+  @@map("replenishment_links")
+}
+
+// ============================================================================
+// KPIs & AGGREGATIONS
+// ============================================================================
+
+model OEESnapshot {
+  id             String   @id @default(uuid())
+  workcenterId   String
+  date           DateTime @db.Date
+  shiftNumber    Int
+  availability   Float
+  performance    Float
+  quality        Float
+  oee            Float
+  plannedTime    Float    // minutes
+  downtime       Float    // minutes
+  operatingTime  Float    // minutes
+  idealCycleTime Float    // minutes
+  totalPieces    Int
+  goodPieces     Int
+  createdAt      DateTime @default(now())
+
+  workcenter Workcenter @relation(fields: [workcenterId], references: [id])
+
+  @@unique([workcenterId, date, shiftNumber])
+  @@index([workcenterId, date])
+  @@map("oee_snapshots")
+}
+
+model ShiftSummary {
+  id           String   @id @default(uuid())
+  date         DateTime @db.Date
+  shiftNumber  Int
+  plannedQty   Float
+  executedQty  Float
+  goodQty      Float
+  scrapQty     Float
+  efficiency   Float
+  createdAt    DateTime @default(now())
+
+  @@unique([date, shiftNumber])
+  @@index([date])
+  @@map("shift_summaries")
+}
+
+model TableUtilization {
+  id             String   @id @default(uuid())
+  workcenterId   String
+  date           DateTime @db.Date
+  shiftNumber    Int
+  totalCapacity  Int      // Total table positions
+  avgOccupied    Float    // Average occupied positions
+  utilizationPct Float    // Percentage
+  createdAt      DateTime @default(now())
+
+  workcenter Workcenter @relation(fields: [workcenterId], references: [id])
+
+  @@unique([workcenterId, date, shiftNumber])
+  @@index([workcenterId, date])
+  @@map("table_utilizations")
+}
