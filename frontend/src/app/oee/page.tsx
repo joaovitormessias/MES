@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import * as motion from "motion/react-client";
-import { Poppins, Lora } from "next/font/google";
 import { AlertTriangle, Timer, Package } from "lucide-react";
 import { useOEE } from "@/hooks/useOEE";
 import { OeeHero } from "@/components/oee/OeeHero";
@@ -10,18 +9,6 @@ import { OeeKpiGrid } from "@/components/oee/OeeKpiGrid";
 import { OeeTrends } from "@/components/oee/OeeTrends";
 import { OeeInsights, OeeInsight } from "@/components/oee/OeeInsights";
 import type { OEEData } from "@/lib/api";
-
-const poppins = Poppins({
-    subsets: ["latin"],
-    weight: ["400", "500", "600", "700"],
-    variable: "--font-oee-display",
-});
-
-const lora = Lora({
-    subsets: ["latin"],
-    weight: ["400", "500", "600", "700"],
-    variable: "--font-oee-body",
-});
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -116,17 +103,17 @@ export default function OeePage() {
             {
                 factor: "Disponibilidade",
                 value: clamp(availabilityLoss, 0, 100),
-                color: "#d97757",
+                color: "#3c7dd9",
             },
             {
                 factor: "Performance",
                 value: clamp(performanceLoss, 0, 100),
-                color: "#6a9bcc",
+                color: "#f0a23a",
             },
             {
                 factor: "Qualidade",
                 value: clamp(qualityLoss, 0, 100),
-                color: "#788c5d",
+                color: "#0f9d88",
             },
         ];
     }, [safeData]);
@@ -142,16 +129,16 @@ export default function OeePage() {
                 title: "Maior perda",
                 value: `${largestLoss.value.toFixed(1)}%`,
                 description: `${largestLoss.factor} concentrou a maior queda no período analisado.`,
-                accent: "#d97757",
-                accentSoft: "rgba(217, 119, 87, 0.18)",
+                accent: "#f0a23a",
+                accentSoft: "rgba(240, 162, 58, 0.18)",
                 icon: <AlertTriangle size={20} />,
             },
             {
                 title: "Paradas não planejadas",
                 value: formatDuration(downtimeSeconds),
                 description: "Tempo de parada acumulado que impactou a disponibilidade.",
-                accent: "#6a9bcc",
-                accentSoft: "rgba(106, 155, 204, 0.18)",
+                accent: "#3c7dd9",
+                accentSoft: "rgba(60, 125, 217, 0.18)",
                 icon: <Timer size={20} />,
             },
             {
@@ -160,15 +147,15 @@ export default function OeePage() {
                 description: totalProduced > 0
                     ? `Qualidade sobre ${totalProduced.toLocaleString("pt-BR")} peças produzidas.`
                     : "Produção ainda não consolidada no período.",
-                accent: "#788c5d",
-                accentSoft: "rgba(120, 140, 93, 0.18)",
+                accent: "#0f9d88",
+                accentSoft: "rgba(15, 157, 136, 0.18)",
                 icon: <Package size={20} />,
             },
         ];
     }, [lossData, safeData]);
 
     return (
-        <div className={`${poppins.variable} ${lora.variable} oee-page`}>
+        <div className="oee-page">
             <div className="oee-shell space-y-10">
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}

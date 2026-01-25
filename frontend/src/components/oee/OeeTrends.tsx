@@ -31,10 +31,10 @@ export function OeeTrends({ trendData, lossData, isLoading }: OeeTrendsProps) {
                                 xField="day"
                                 yField="value"
                                 shapeField="smooth"
-                                style={{ fill: "rgba(106, 155, 204, 0.22)", lineWidth: 2, stroke: "#6a9bcc" }}
+                                style={{ fill: "rgba(60, 125, 217, 0.22)", lineWidth: 2, stroke: "#3c7dd9" }}
                                 axis={{
-                                    x: { label: { style: { fill: "#5f5a53", fontSize: 11 } } },
-                                    y: { label: { style: { fill: "#5f5a53", fontSize: 11 } } },
+                                    x: { label: { style: { fill: "#4b5b6b", fontSize: 11 } } },
+                                    y: { label: { style: { fill: "#4b5b6b", fontSize: 11 } } },
                                 }}
                                 tooltip={{ formatter: (datum) => ({ name: "OEE", value: `${datum.value.toFixed(1)}%` }) }}
                                 padding="auto"
@@ -63,8 +63,8 @@ export function OeeTrends({ trendData, lossData, isLoading }: OeeTrendsProps) {
                                 columnStyle={{ radius: [12, 12, 0, 0] }}
                                 color={(datum) => datum.color}
                                 axis={{
-                                    x: { label: { style: { fill: "#5f5a53", fontSize: 11 } } },
-                                    y: { label: { style: { fill: "#5f5a53", fontSize: 11 } } },
+                                    x: { label: { style: { fill: "#4b5b6b", fontSize: 11 } } },
+                                    y: { label: { style: { fill: "#4b5b6b", fontSize: 11 } } },
                                 }}
                                 tooltip={{ formatter: (datum) => ({ name: "Perda", value: `${datum.value.toFixed(1)}%` }) }}
                                 padding="auto"

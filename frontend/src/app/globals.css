@@ -711,19 +711,17 @@ body {
 }
 
 .oee-page {
-  --oee-ink: #141413;
-  --oee-muted: #5f5a53;
-  --oee-paper: #faf9f5;
-  --oee-card: rgba(255, 255, 255, 0.92);
-  --oee-border: #e8e6dc;
-  --oee-accent: #d97757;
-  --oee-accent-blue: #6a9bcc;
-  --oee-accent-green: #788c5d;
-  --oee-shadow: 0 24px 36px rgba(20, 20, 19, 0.1);
-  --font-display: var(--font-oee-display);
-  --font-body: var(--font-oee-body);
+  --oee-ink: var(--color-text-primary);
+  --oee-muted: var(--color-text-secondary);
+  --oee-paper: var(--color-bg-primary);
+  --oee-card: var(--color-bg-secondary);
+  --oee-border: var(--color-border);
+  --oee-accent: var(--color-warning);
+  --oee-accent-blue: var(--color-info);
+  --oee-accent-green: var(--color-success);
+  --oee-shadow: var(--shadow-card);
   color: var(--oee-ink);
-  font-family: var(--font-body), "Lora", "Georgia", serif;
+  font-family: var(--font-body), "Source Sans 3", "Segoe UI", sans-serif;
 }
 
 .oee-page h1,
@@ -731,16 +729,12 @@ body {
 .oee-page h3,
 .oee-page .oee-title,
 .oee-page .oee-section-title {
-  font-family: var(--font-display), "Poppins", "Arial", sans-serif;
+  font-family: var(--font-display), "Space Grotesk", "Segoe UI", sans-serif;
   letter-spacing: -0.02em;
 }
 
 .oee-shell {
   background-color: var(--oee-paper);
-  background-image:
-    radial-gradient(circle at 10% 15%, rgba(217, 119, 87, 0.14), transparent 45%),
-    radial-gradient(circle at 90% 10%, rgba(106, 155, 204, 0.15), transparent 40%),
-    linear-gradient(180deg, rgba(250, 249, 245, 0.95), rgba(243, 239, 230, 0.95));
   border: 1px solid var(--oee-border);
   border-radius: 28px;
   padding: 32px;
@@ -771,7 +765,7 @@ body {
   top: -60px;
   width: 240px;
   height: 240px;
-  background: radial-gradient(circle, rgba(120, 140, 93, 0.18), transparent 70%);
+  background: radial-gradient(circle, rgba(31, 76, 107, 0.16), transparent 70%);
   pointer-events: none;
 }
 
@@ -781,12 +775,12 @@ body {
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(20, 20, 19, 0.08);
+  background: var(--color-bg-tertiary);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--oee-ink);
+  color: var(--color-text-secondary);
 }
 
 .oee-title {
@@ -806,7 +800,7 @@ body {
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid var(--oee-border);
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--oee-card);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -825,26 +819,26 @@ body {
 }
 
 .oee-status.positive {
-  color: var(--oee-accent-green);
-  background: rgba(120, 140, 93, 0.16);
-  border-color: rgba(120, 140, 93, 0.35);
+  color: var(--color-success);
+  background: rgba(15, 157, 136, 0.16);
+  border-color: rgba(15, 157, 136, 0.35);
 }
 
 .oee-status.warning {
-  color: var(--oee-accent);
-  background: rgba(217, 119, 87, 0.14);
-  border-color: rgba(217, 119, 87, 0.3);
+  color: var(--color-warning);
+  background: rgba(240, 162, 58, 0.16);
+  border-color: rgba(240, 162, 58, 0.35);
 }
 
 .oee-status.danger {
-  color: var(--oee-ink);
-  background: rgba(20, 20, 19, 0.1);
-  border-color: rgba(20, 20, 19, 0.2);
+  color: var(--color-danger);
+  background: rgba(224, 85, 85, 0.16);
+  border-color: rgba(224, 85, 85, 0.32);
 }
 
 .oee-primary-button {
-  background: var(--oee-accent);
-  color: #faf9f5;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border-radius: 999px;
   height: 44px;
   padding: 0 22px;
@@ -852,7 +846,7 @@ body {
 }
 
 .oee-primary-button:hover {
-  background: #c86a4b;
+  background: var(--color-primary-dark);
 }
 
 .oee-secondary-button {
@@ -868,7 +862,7 @@ body {
   width: 220px;
   height: 220px;
   border-radius: 999px;
-  background: conic-gradient(var(--oee-accent) var(--oee-value), var(--oee-border) 0);
+  background: conic-gradient(var(--color-primary) var(--oee-value), var(--oee-border) 0);
   padding: 14px;
   display: flex;
   align-items: center;
@@ -948,7 +942,7 @@ body {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: rgba(20, 20, 19, 0.08);
+  background: var(--color-bg-tertiary);
   overflow: hidden;
 }
 

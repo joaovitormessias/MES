@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { TopBarFilterProvider } from "@/components/layout/TopBarFilterContext";
 import { usePathname } from "next/navigation";
 
 interface AppLayoutProps {
@@ -25,10 +26,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                 onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             />
             <main className="app-main">
-                <TopBar showDateFilter={pathname.includes("dashboard")} showExport={pathname.includes("dashboard")} />
-                <div className="app-content">
-                    {children}
-                </div>
+                <TopBarFilterProvider>
+                    <TopBar showDateFilter={pathname.includes("dashboard")} showExport={pathname.includes("dashboard")} />
+                    <div className="app-content">
+                        {children}
+                    </div>
+                </TopBarFilterProvider>
             </main>
         </div>
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as motion from "motion/react-client";
 import {
     Card,
@@ -30,6 +30,7 @@ import {
     ChevronRight,
     Filter,
 } from "lucide-react";
+import { useTopBarFilters } from "@/components/layout/TopBarFilterContext";
 
 // Dados mockados de OPs
 const mockOPs = [
@@ -135,9 +136,48 @@ const getStatusIcon = (status: string) => {
 
 export default function OrdensProducaoPage() {
     const router = useRouter();
-    const [searchValue, setSearchValue] = useState("");
-    const [statusFilter, setStatusFilter] = useState<string>("");
+    const { registerFilters, clearFilters, values, setFilterValue } = useTopBarFilters();
     const [currentPage, setCurrentPage] = useState(1);
+    const filterConfig = useMemo(
+        () => ({
+            title: "Ordens de Produção",
+            fields: [
+                {
+                    key: "search",
+                    label: "Buscar",
+                    type: "search" as const,
+                    placeholder: "Buscar por código, item...",
+                },
+                {
+                    key: "status",
+                    label: "Status",
+                    type: "select" as const,
+                    placeholder: "Todos os status",
+                    defaultValue: "",
+                    options: [
+                        { label: "Todos", value: "" },
+                        { label: "Não Iniciada", value: "OPEN_NOT_STARTED" },
+                        { label: "Em Progresso", value: "IN_PROGRESS" },
+                        { label: "Parcialmente Aberta", value: "OPEN_PARTIAL" },
+                        { label: "Fechada", value: "CLOSED" },
+                    ],
+                },
+            ],
+        }),
+        []
+    );
+
+    useEffect(() => {
+        registerFilters(filterConfig);
+        return () => clearFilters();
+    }, [registerFilters, clearFilters, filterConfig]);
+
+    const searchValue = values.search ?? "";
+    const statusFilter = values.status ?? "";
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchValue, statusFilter]);
 
     const filteredOPs = mockOPs.filter((op) => {
         const matchesSearch =
@@ -237,13 +277,13 @@ export default function OrdensProducaoPage() {
                                 placeholder="Buscar por código, item..."
                                 startContent={<Search size={18} className="text-gray-400" />}
                                 value={searchValue}
-                                onValueChange={setSearchValue}
+                                onValueChange={(value) => setFilterValue("search", value)}
                                 className="w-80"
                             />
                             <Select
                                 placeholder="Filtrar por status"
                                 selectedKeys={statusFilter ? [statusFilter] : []}
-                                onChange={(e) => setStatusFilter(e.target.value)}
+                                onChange={(event) => setFilterValue("status", event.target.value)}
                                 className="w-48"
                                 startContent={<Filter size={16} className="text-gray-400" />}
                             >

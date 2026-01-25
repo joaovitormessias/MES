@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo } from "react";
 import * as motion from "motion/react-client";
 import {
     Card,
@@ -18,6 +18,7 @@ import {
     XCircle,
     ChevronRight,
 } from "lucide-react";
+import { useTopBarFilters } from "@/components/layout/TopBarFilterContext";
 
 // Alertas mockados
 const mockAlerts = [
@@ -103,7 +104,34 @@ const getAlertTypeName = (type: string): string => {
 };
 
 export default function AlertasPage() {
-    const [selectedTab, setSelectedTab] = useState("all");
+    const { registerFilters, clearFilters, values, setFilterValue } = useTopBarFilters();
+    const filterConfig = useMemo(
+        () => ({
+            title: "Alertas",
+            fields: [
+                {
+                    key: "alertType",
+                    label: "Tipo de alerta",
+                    type: "select" as const,
+                    defaultValue: "all",
+                    options: [
+                        { label: "Todos", value: "all" },
+                        { label: "Não lidas", value: "unread" },
+                        { label: "Críticos", value: "error" },
+                        { label: "Avisos", value: "warning" },
+                    ],
+                },
+            ],
+        }),
+        []
+    );
+
+    useEffect(() => {
+        registerFilters(filterConfig);
+        return () => clearFilters();
+    }, [registerFilters, clearFilters, filterConfig]);
+
+    const selectedTab = values.alertType ?? "all";
 
     const filteredAlerts = mockAlerts.filter((alert) => {
         if (selectedTab === "all") return true;
@@ -205,7 +233,7 @@ export default function AlertasPage() {
                 <Tabs
                     aria-label="Filtros de alerta"
                     selectedKey={selectedTab}
-                    onSelectionChange={(key) => setSelectedTab(key as string)}
+                    onSelectionChange={(key) => setFilterValue("alertType", key as string)}
                     color="primary"
                     variant="underlined"
                 >

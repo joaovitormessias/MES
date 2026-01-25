@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Avatar, Badge } from "@heroui/react";
+import { Avatar, Badge, Button, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { Search, Bell, Calendar, Filter, ChevronDown, Download } from "lucide-react";
+import { TopBarFilters } from "@/components/layout/TopBarFilters";
+import { useTopBarFilters } from "@/components/layout/TopBarFilterContext";
 
 interface TopBarProps {
     title?: string;
@@ -11,7 +13,26 @@ interface TopBarProps {
 }
 
 export function TopBar({ title = "Painel", showDateFilter = true, showExport = false }: TopBarProps) {
-    const [searchValue, setSearchValue] = useState("");
+    const [fallbackSearchValue, setFallbackSearchValue] = useState("");
+    const { config, values, setFilterValue, resetFilters, hasActiveFilters } = useTopBarFilters();
+    const searchField = config?.fields.find((field) => field.type === "search");
+    const filterFields = config?.fields.filter((field) => field.type !== "search") ?? [];
+    const showFilterControls = filterFields.length > 0;
+    const searchValue = searchField ? values[searchField.key] ?? "" : fallbackSearchValue;
+    const searchTarget = config?.title ?? title;
+    const searchPlaceholder =
+        searchField?.placeholder ?? `Buscar em ${searchTarget.toLowerCase()}...`;
+    const notificationCount = 3;
+    const hasNotifications = notificationCount > 0;
+
+    const handleSearchChange = (nextValue: string) => {
+        if (searchField) {
+            setFilterValue(searchField.key, nextValue);
+            return;
+        }
+
+        setFallbackSearchValue(nextValue);
+    };
 
     return (
         <header className="app-topbar w-full gap-4">
@@ -21,10 +42,10 @@ export function TopBar({ title = "Painel", showDateFilter = true, showExport = f
                     <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" />
                     <input
                         type="text"
-                        placeholder={`Buscar em ${title.toLowerCase()}...`}
+                        placeholder={searchPlaceholder}
                         value={searchValue}
-                        onChange={(e) => setSearchValue(e.target.value)}
-                        aria-label={`Buscar em ${title}`}
+                        onChange={(event) => handleSearchChange(event.target.value)}
+                        aria-label={`Buscar em ${searchTarget}`}
                         className="w-full bg-gray-50 hover:bg-gray-100 focus:bg-white border border-transparent focus:border-primary/20 rounded-xl pl-10 pr-12 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium text-gray-700 placeholder:text-gray-400"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
@@ -61,14 +82,42 @@ export function TopBar({ title = "Painel", showDateFilter = true, showExport = f
                         </>
                     )}
 
-                    <Button
-                        variant="bordered"
-                        size="sm"
-                        startContent={<Filter size={16} />}
-                        className="h-9 rounded-lg bg-white border-gray-200 text-gray-600 font-medium hover:bg-gray-50"
-                    >
-                        Filtrar
-                    </Button>
+                    {showFilterControls && (
+                        <Popover placement="bottom-end">
+                            <PopoverTrigger>
+                                <Badge
+                                    isDot
+                                    color="primary"
+                                    placement="top-right"
+                                    showOutline
+                                    isInvisible={!hasActiveFilters}
+                                    classNames={{ badge: "border-2 border-white" }}
+                                >
+                                    <Button
+                                        variant="bordered"
+                                        size="sm"
+                                        startContent={<Filter size={16} />}
+                                        className={`h-9 rounded-lg border-gray-200 font-medium hover:bg-gray-50 ${
+                                            hasActiveFilters
+                                                ? "bg-primary/10 text-primary border-primary/20"
+                                                : "bg-white text-gray-600"
+                                        }`}
+                                    >
+                                        Filtrar
+                                    </Button>
+                                </Badge>
+                            </PopoverTrigger>
+                            <PopoverContent className="p-0 border border-gray-200 shadow-xl">
+                                <TopBarFilters
+                                    title={config?.title ? `Filtros de ${config.title}` : undefined}
+                                    fields={filterFields}
+                                    values={values}
+                                    onChange={setFilterValue}
+                                    onReset={resetFilters}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    )}
 
                     {showExport && (
                         <Button
@@ -88,12 +137,13 @@ export function TopBar({ title = "Painel", showDateFilter = true, showExport = f
                 {/* Notificações - Área Refinada */}
                 <div className="relative flex items-center justify-center w-9 h-9">
                     <Badge
-                        content="3"
+                        isDot
                         color="danger"
                         size="sm"
-                        shape="circle"
-                        showOutline={false}
-                        className="border-[1.5px] border-white shadow-sm font-bold text-[10px]"
+                        placement="top-right"
+                        showOutline
+                        isInvisible={!hasNotifications}
+                        classNames={{ badge: "border-2 border-white" }}
                     >
                         <Button
                             isIconOnly
