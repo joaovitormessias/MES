@@ -85,7 +85,7 @@ model Routing {
   updatedAt DateTime @updatedAt
 
   item  Item          @relation("ItemRoutings", fields: [itemId], references: [id])
-  steps RoutingStep[]
+  steps RoutingStep[] @relation("RoutingToSteps")
 
   @@unique([itemId, version])
   @@index([itemId, isActive])
@@ -101,7 +101,7 @@ model RoutingStep {
   setupTime     Float? // minutes
   runTime       Float? // minutes per piece
 
-  routing     Routing      @relation("ItemRoutings", fields: [routingId], references: [id])
+  routing     Routing      @relation("RoutingToSteps", fields: [routingId], references: [id])
   processStep ProcessStep  @relation(fields: [processStepId], references: [id])
   workcenter  Workcenter?  @relation(fields: [workcenterId], references: [id])
 
@@ -129,11 +129,100 @@ model Workcenter {
   approvals         Approval[]
   oeeSnapshots      OEESnapshot[]
   tableUtilizations TableUtilization[]
+  iotDevices        IoTDevice[]
 
   @@index([code])
   @@index([isEnabled])
   @@map("workcenters")
 }
+
+// ============================================================================
+// IOT & DIGITAL TWIN
+// ============================================================================
+
+model IoTDevice {
+  id           String      @id @default(uuid())
+  deviceCode   String      @unique
+  name         String
+  workcenterId String?
+  deviceType   DeviceType
+  thingsBoardId String?    @unique // ThingsBoard device ID
+  accessToken  String?     // ThingsBoard device access token
+  isOnline     Boolean     @default(false)
+  lastSeenAt   DateTime?
+  metadata     Json?       // Additional device metadata
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  workcenter   Workcenter? @relation(fields: [workcenterId], references: [id])
+  telemetry    TelemetrySnapshot[]
+  alerts       IoTAlert[]
+
+  @@index([deviceCode])
+  @@index([workcenterId])
+  @@index([isOnline])
+  @@map("iot_devices")
+}
+
+model TelemetrySnapshot {
+  id        String   @id @default(uuid())
+  deviceId  String
+  ts        DateTime @default(now())
+  metrics   Json     // { temperature, humidity, speed, pressure, etc. }
+
+  device    IoTDevice @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId, ts])
+  @@map("telemetry_snapshots")
+}
+
+model IoTAlert {
+  id          String        @id @default(uuid())
+  deviceId    String
+  alertType   IoTAlertType
+  severity    AlertSeverity
+  message     String
+  value       Float?
+  threshold   Float?
+  acknowledged Boolean      @default(false)
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  createdAt   DateTime      @default(now())
+
+  device      IoTDevice     @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId])
+  @@index([alertType])
+  @@index([acknowledged])
+  @@index([createdAt])
+  @@map("iot_alerts")
+}
+
+enum DeviceType {
+  SENSOR
+  PLC
+  CAMERA
+  GATEWAY
+  SIMULATOR
+}
+
+enum IoTAlertType {
+  TEMPERATURE_HIGH
+  TEMPERATURE_LOW
+  PRESSURE_HIGH
+  PRESSURE_LOW
+  VIBRATION_HIGH
+  DEVICE_OFFLINE
+  THRESHOLD_EXCEEDED
+  MAINTENANCE_DUE
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
 
 enum WorkcenterType {
   OPTIMIZER

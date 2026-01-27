@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Avatar, Badge, Button, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { Search, Bell, Calendar, Filter, ChevronDown, Download } from "lucide-react";
+import * as motion from "motion/react-client";
 import { TopBarFilters } from "@/components/layout/TopBarFilters";
 import { useTopBarFilters } from "@/components/layout/TopBarFilterContext";
 
@@ -135,27 +136,37 @@ export function TopBar({ title = "Painel", showDateFilter = true, showExport = f
                 <div className="hidden lg:block w-px h-6 bg-gray-200 mx-1" />
 
                 {/* Notificações - Área Refinada */}
-                <div className="relative flex items-center justify-center w-9 h-9">
-                    <Badge
-                        isDot
-                        color="danger"
-                        size="sm"
-                        placement="top-right"
-                        showOutline
-                        isInvisible={!hasNotifications}
-                        classNames={{ badge: "border-2 border-white" }}
-                    >
-                        <Button
-                            isIconOnly
-                            variant="light"
-                            radius="full"
-                            size="md"
-                            aria-label="Notificações"
-                            className="h-9 w-9 bg-transparent hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
+                <div className="relative flex items-center justify-center h-12 w-12">
+                    <motion.div whileHover={{ y: -1 }} transition={{ duration: 0.12 }}>
+                        <Badge
+                            isDot
+                            color="danger"
+                            size="sm"
+                            placement="top-right"
+                            showOutline
+                            isInvisible={!hasNotifications}
+                            classNames={{ badge: "border-2 border-white" }}
                         >
-                            <Bell size={20} />
-                        </Button>
-                    </Badge>
+                            <Button
+                                isIconOnly
+                                variant="light"
+                                radius="full"
+                                size="md"
+                                aria-label="Notifications"
+                                className={[
+                                    "relative h-12 w-12 min-w-12 p-0 grid place-items-center",
+                                    "!bg-transparent hover:!bg-transparent data-[hovered=true]:!bg-transparent",
+                                    "text-gray-500 hover:text-gray-900 transition-colors",
+                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                                    "before:content-[''] before:absolute before:inset-2 before:rounded-full",
+                                    "before:shadow-lg before:opacity-0 before:scale-95 before:transition before:duration-150",
+                                    "hover:before:opacity-100 hover:before:scale-100",
+                                ].join(" ")}
+                            >
+                                <Bell className="relative z-10 h-5 w-5" />
+                            </Button>
+                        </Badge>
+                    </motion.div>
                 </div>
 
                 {/* Avatar do Usuário */}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { TopBarFilterProvider } from "@/components/layout/TopBarFilterContext";
+import { AIAssistantFAB } from "@/components/ai/AIAssistantFAB";
 import { usePathname } from "next/navigation";
 
 interface AppLayoutProps {
@@ -33,8 +34,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </div>
                 </TopBarFilterProvider>
             </main>
+
+            {/* AI Assistant Floating Action Button */}
+            <AIAssistantFAB />
         </div>
     );
 }
 
 export default AppLayout;
+

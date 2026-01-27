@@ -16,6 +16,9 @@ import {
     ChevronLeft,
     Factory,
     Users,
+    Box,
+    Wifi,
+    AlertTriangle,
 } from "lucide-react";
 
 interface NavItem {
@@ -47,6 +50,14 @@ const navigation: NavSection[] = [
             { label: "Rastreabilidade", href: "/traceability", icon: <FileSearch size={20} /> },
             { label: "Qualidade", href: "/quality", icon: <BarChart3 size={20} /> },
             { label: "Análise de OEE", href: "/oee", icon: <Gauge size={20} /> },
+        ],
+    },
+    {
+        title: "DIGITAL TWIN",
+        items: [
+            { label: "Visão Geral", href: "/digital-twin", icon: <Box size={20} /> },
+            { label: "Dispositivos IoT", href: "/digital-twin/devices", icon: <Wifi size={20} /> },
+            { label: "Alertas IoT", href: "/digital-twin/alerts", icon: <AlertTriangle size={20} /> },
         ],
     },
     {

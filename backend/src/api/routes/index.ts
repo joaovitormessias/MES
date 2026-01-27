@@ -5,6 +5,7 @@ import traceabilityRoutes from './traceability.routes';
 import dashboardsRoutes from './dashboards.routes';
 import kpisRoutes from './kpis.routes';
 import approvalsRoutes from './approvals.routes';
+import iotRoutes from './iot.routes';
 
 const router = Router();
 
@@ -15,5 +16,6 @@ router.use('/traceability', traceabilityRoutes);
 router.use('/dashboards', dashboardsRoutes);
 router.use('/kpis', kpisRoutes);
 router.use('/approvals', approvalsRoutes);
+router.use('/iot', iotRoutes);
 
 export default router;

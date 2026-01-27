@@ -60,6 +60,17 @@ interface Config {
         oeeCalcCron: string;
         shiftConsolidationCron: string;
     };
+    thingsboard: {
+        url: string;
+        accessToken: string;
+        username: string;
+        password: string;
+        deviceName: string;
+        pollIntervalS: number;
+    };
+    openai: {
+        apiKey: string;
+    };
 }
 
 const config: Config = {
@@ -119,6 +130,17 @@ const config: Config = {
         erpSyncCron: process.env.ERP_SYNC_CRON || '*/5 * * * *',
         oeeCalcCron: process.env.OEE_CALC_CRON || '0 * * * *',
         shiftConsolidationCron: process.env.SHIFT_CONSOLIDATION_CRON || '0 6,14,22 * * *',
+    },
+    thingsboard: {
+        url: process.env.TB_URL || 'http://localhost:8080',
+        accessToken: process.env.ACCESS_TOKEN || '',
+        username: process.env.TB_USERNAME || 'admin@tenant.org',
+        password: process.env.TB_PASSWORD || '',
+        deviceName: process.env.TB_DEVICE_NAME || 'serra_01',
+        pollIntervalS: parseFloat(process.env.TB_POLL_INTERVAL_S || '1.0'),
+    },
+    openai: {
+        apiKey: process.env.OPENAI_API_KEY || '',
     },
 };
 
