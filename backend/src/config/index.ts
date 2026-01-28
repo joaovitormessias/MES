@@ -80,7 +80,7 @@ const config: Config = {
         apiVersion: process.env.API_VERSION || 'v1',
     },
     database: {
-        url: process.env.DATABASE_URL || 'postgresql://mes_user:mes_password@localhost:5432/mes_renar',
+        url: process.env.DATABASE_URL || 'postgresql://mes_user:mes_password@localhost:5433/mes_renar',
     },
     redis: {
         url: process.env.REDIS_URL || 'redis://localhost:6379',

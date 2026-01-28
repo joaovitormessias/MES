@@ -1,23 +1,24 @@
 "use client";
+"use client";
 
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
-import { Card, CardBody, CardHeader, Button, Chip, Skeleton } from "@heroui/react";
+import { Button, Card, CardBody, CardHeader, Chip, Skeleton } from "@heroui/react";
 import * as motion from "motion/react-client";
 import {
-    Eye,
-    DollarSign,
-    TrendingUp,
     Activity,
     ArrowUpRight,
+    DollarSign,
+    Eye,
     RefreshCw,
+    TrendingUp,
 } from "lucide-react";
+import { GrafanaSection } from "@/components/dashboard/GrafanaSection";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { WorkcenterStatusTable } from "@/components/dashboard/WorkcenterStatusTable";
 import { useDashboardMetrics, useWorkcenterStatus } from "@/hooks/useDashboardMetrics";
 import { WorkcenterType } from "@/types/database";
 
-// Dynamic import of charts
 const Column = dynamic(() => import("@ant-design/plots").then((mod) => mod.Column), { ssr: false });
 const Area = dynamic(() => import("@ant-design/plots").then((mod) => mod.Area), { ssr: false });
 const Pie = dynamic(() => import("@ant-design/plots").then((mod) => mod.Pie), { ssr: false });
@@ -39,7 +40,7 @@ export default function DashboardPage() {
             { day: "Qua", value: 82 },
             { day: "Qui", value: 79 },
             { day: "Sex", value: 88 },
-            { day: "Sáb", value: 75 },
+            { day: "Sab", value: 75 },
         ],
         productionByRegion: [
             { month: "Out", value: 2988.2, region: "CNC" },
@@ -96,8 +97,7 @@ export default function DashboardPage() {
     const safeWorkcenters = workcenters && workcenters.length > 0 ? workcenters : fallbackWorkcenters;
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
+        <div className="space-y-10">
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -107,7 +107,7 @@ export default function DashboardPage() {
                 <div className="page-header-row">
                     <div>
                         <h1 className="page-title">Painel de Controle</h1>
-                        <p className="page-subtitle">Monitoramento em tempo real e indicadores de produção</p>
+                        <p className="page-subtitle">Monitoramento em tempo real e indicadores de producao</p>
                     </div>
                     <div className="page-actions">
                         <Button
@@ -115,6 +115,7 @@ export default function DashboardPage() {
                             variant="light"
                             onPress={() => refetchMetrics()}
                             isLoading={isLoading}
+                            aria-label="Atualizar indicadores"
                         >
                             <RefreshCw size={20} />
                         </Button>
@@ -122,7 +123,6 @@ export default function DashboardPage() {
                 </div>
             </motion.div>
 
-            {/* KPIs */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -138,20 +138,20 @@ export default function DashboardPage() {
                 ) : (
                     <>
                         <KPICard
-                            label="Peças Hoje"
-                            value={safeMetrics.totalPiecesToday.toLocaleString('pt-BR')}
+                            label="Pecas Hoje"
+                            value={safeMetrics.totalPiecesToday.toLocaleString("pt-BR")}
                             icon={<Eye size={24} />}
                             variant="primary"
                             trend={{ value: 4.2, direction: "up", label: "vs ontem" }}
                         />
                         <KPICard
                             label="Valor Estimado"
-                            value={`R$ ${safeMetrics.totalValueToday.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                            value={`R$ ${safeMetrics.totalValueToday.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
                             icon={<DollarSign size={24} />}
                             variant="success"
                         />
                         <KPICard
-                            label="OEE Médio"
+                            label="OEE Medio"
                             value={`${safeMetrics.avgOee.toFixed(1)}%`}
                             icon={<Activity size={24} />}
                             variant={safeMetrics.avgOee > 85 ? "success" : "warning"}
@@ -160,29 +160,27 @@ export default function DashboardPage() {
                 )}
             </motion.div>
 
-            {/* Main Charts */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.2 }}
                 className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             >
-                {/* Production Overview */}
                 <div className="lg:col-span-2">
                     <Card className="card h-full min-h-[400px]">
                         <CardHeader className="card-header flex justify-between items-start">
                             <div>
-                                <h2 className="card-title">Visão Geral da Produção</h2>
+                                <h2 className="card-title">Visao Geral da Producao</h2>
                                 {!isLoading && (
                                     <>
                                         <p className="text-2xl font-bold text-gray-900 mt-2">
-                                            R$ {safeMetrics.totalValueToday.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            R$ {safeMetrics.totalValueToday.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                                         </p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <Chip size="sm" color="success" variant="flat" startContent={<TrendingUp size={12} />}>
                                                 +12.5%
                                             </Chip>
-                                            <span className="text-sm text-gray-500">vs último mês</span>
+                                            <span className="text-sm text-gray-500">vs ultimo mes</span>
                                         </div>
                                     </>
                                 )}
@@ -210,12 +208,11 @@ export default function DashboardPage() {
                     </Card>
                 </div>
 
-                {/* OEE Trend */}
                 <Card className="card">
                     <CardHeader className="card-header">
                         <div className="flex justify-between items-start w-full">
                             <div>
-                                <h2 className="card-title">Tendência OEE</h2>
+                                <h2 className="card-title">Tendencia OEE</h2>
                                 {!isLoading && (
                                     <p className="text-3xl font-bold text-gray-900 mt-2">
                                         {safeMetrics.avgOee.toFixed(1)}%
@@ -246,17 +243,15 @@ export default function DashboardPage() {
                 </Card>
             </motion.div>
 
-            {/* Bottom Row */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.3 }}
                 className="grid grid-cols-1 lg:grid-cols-2 gap-6"
             >
-                {/* Process Distribution */}
                 <Card className="card">
                     <CardHeader className="card-header flex justify-between items-center">
-                        <h2 className="card-title">Distribuição por Processo</h2>
+                        <h2 className="card-title">Distribuicao por Processo</h2>
                     </CardHeader>
                     <CardBody>
                         {isLoading ? (
@@ -295,7 +290,6 @@ export default function DashboardPage() {
                     </CardBody>
                 </Card>
 
-                {/* Status Table */}
                 <Card className="card">
                     <CardHeader className="card-header flex justify-between items-center">
                         <h2 className="card-title">Status dos Centros de Trabalho</h2>
@@ -316,6 +310,8 @@ export default function DashboardPage() {
                     </CardBody>
                 </Card>
             </motion.div>
+
+            <GrafanaSection />
         </div>
     );
 }
