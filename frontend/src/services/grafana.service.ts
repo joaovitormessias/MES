@@ -1,14 +1,12 @@
-import { callEdgeFunction } from "@/lib/supabase";
+import axios from "axios";
 import type { GrafanaDashboardPanels, GrafanaDashboardSummary } from "@/types/grafana";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3050/api/v1";
 
 export const GrafanaService = {
     async listDashboards(): Promise<GrafanaDashboardSummary[]> {
-        const { data, error } = await callEdgeFunction<{ data: GrafanaDashboardSummary[] }>(
-            "grafana/dashboards",
-        );
-
-        if (error) throw error;
-        return data?.data ?? [];
+        const response = await axios.get(`${API_BASE_URL}/grafana/dashboards`);
+        return response.data?.data ?? [];
     },
 
     async getDashboardPanels(
@@ -19,12 +17,10 @@ export const GrafanaService = {
         if (range?.from) params.from = range.from;
         if (range?.to) params.to = range.to;
 
-        const { data, error } = await callEdgeFunction<GrafanaDashboardPanels>(
-            `grafana/dashboards/${uid}`,
-            { params },
-        );
+        const response = await axios.get(`${API_BASE_URL}/grafana/dashboards/${uid}`, {
+            params,
+        });
 
-        if (error) throw error;
-        return data!;
+        return response.data?.data ?? null;
     },
 };

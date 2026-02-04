@@ -1,0 +1,209 @@
+services:
+  # -----------------------------
+  # MES Services
+  # -----------------------------
+  mes-postgres:
+    image: postgres:16-alpine
+    container_name: mes-postgres
+    environment:
+      POSTGRES_USER: mes_user
+      POSTGRES_PASSWORD: mes_password
+      POSTGRES_DB: mes_renar
+    ports:
+      - "5433:5432"
+    volumes:
+      - mes_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U mes_user -d mes_renar" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - unified_net
+
+  mes-redis:
+    image: redis:7-alpine
+    container_name: mes-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - mes_redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - unified_net
+
+  mes-pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mes-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@renar.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - mes-postgres
+    profiles:
+      - tools
+    networks:
+      - unified_net
+
+  mes-redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: mes-redis-insight
+    ports:
+      - "8001:8001"
+    depends_on:
+      - mes-redis
+    profiles:
+      - tools
+    networks:
+      - unified_net
+
+  # -----------------------------
+  # Digital Twin Services
+  # -----------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: dt-mosquitto
+    ports:
+      - "1884:1883"
+      - "9001:9001"
+    volumes:
+      - ./digital-twin/docker/services/mosquitto/mosquito.conf:/mosquitto/config/mosquitto.conf
+    restart: unless-stopped
+    networks:
+      - unified_net
+
+  thingsboard:
+    image: thingsboard/tb-postgres:latest
+    container_name: dt-thingsboard
+    depends_on:
+      - mosquitto
+    ports:
+      - "8080:9090"
+      - "1885:1883"
+      - "7070:7070"
+      - "5683-5688:5683-5688/udp"
+    environment:
+      TB_QUEUE_TYPE: in-memory
+    volumes:
+      - dt_tb_data:/data
+    restart: unless-stopped
+    networks:
+      - unified_net
+
+  dt-postgres:
+    image: postgres:16
+    container_name: dt-postgres
+    environment:
+      POSTGRES_DB: digital_twin
+      POSTGRES_USER: twin
+      POSTGRES_PASSWORD: twinpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - dt_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - unified_net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dt-grafana
+    ports:
+      - "3002:3000" # Changed from 3001 to 3002 to avoid conflict with frontend
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - dt_grafana_data:/var/lib/grafana
+    depends_on:
+      - dt-postgres
+    restart: unless-stopped
+    networks:
+      - unified_net
+
+  dt-backend:
+    build:
+      context: ./digital-twin
+      dockerfile: backend/Dockerfile
+    container_name: dt-backend
+    ports:
+      - "8000:8000"
+    environment:
+      TB_URL: "http://dt-thingsboard:9090"
+      TB_USERNAME: "admin@tenant.org"
+      TB_PASSWORD: "123456"
+      TB_DEVICE_NAME: "serra_01"
+      DATABASE_URL: "postgresql://twin:twinpass@dt-postgres:5432/digital_twin"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+    depends_on:
+      - dt-postgres
+      - thingsboard
+    restart: unless-stopped
+    networks:
+      - unified_net
+
+  gazebo:
+    build:
+      context: ./digital-twin
+      dockerfile: gazebo/Dockerfile
+    container_name: dt-gazebo
+    ports:
+      - "9002:9002"
+    volumes:
+      - ./digital-twin/gazebo:/ws/gazebo
+    environment:
+      GZ_SIM_RESOURCE_PATH: /ws/gazebo/models:/ws/gazebo/models/worlds
+      IGN_GAZEBO_RESOURCE_PATH: /ws/gazebo/models:/ws/gazebo/models/worlds
+    command: [ "bash", "-lc", "gz sim -s -r /ws/gazebo/models/worlds/sawmill.world" ]
+    depends_on:
+      - mosquitto
+      - thingsboard
+    networks:
+      - unified_net
+
+  # -----------------------------
+  # Bridge Service
+  # -----------------------------
+  bridge:
+    build:
+      context: ./bridge
+    container_name: mes-bridge
+    depends_on:
+      - mosquitto
+      - thingsboard
+      - mes-postgres
+    environment:
+      MQTT_HOST: dt-mosquitto
+        # Or host.docker.internal if connecting to TB port 1885? 
+        # If TB is in the network, we can use service name 'dt-thingsboard' port 1883 or 9090?
+        # TB exposes MQTT on 1883 internally? 
+        # publisher_mqtt.py uses TB_MQTT_PORT=1885 (external). Internal is 1883.
+      MQTT_PORT: 1883 # Internal port for ThingsBoard MQTT
+      MQTT_TOPIC: v1/devices/me/telemetry
+      MQTT_USERNAME: "${ACCESS_TOKEN}" # From user env
+      MES_BASE_URL: "http://host.docker.internal:3050/api/v1" # MES runs on host port 3050
+      MES_TOKEN: "${MES_TOKEN}"
+      MES_OP_ID: "1"
+      MES_STEP_ID: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - unified_net
+
+networks:
+  unified_net:
+    driver: bridge
+
+volumes:
+  mes_postgres_data:
+  mes_redis_data:
+  dt_postgres_data:
+  dt_grafana_data:
+  dt_tb_data:

@@ -28,7 +28,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             />
             <main className="app-main">
                 <TopBarFilterProvider>
-                    <TopBar showDateFilter={pathname.includes("dashboard")} showExport={pathname.includes("dashboard")} />
+                    <TopBar showDateFilter={false} showExport={false} />
                     <div className="app-content">
                         {children}
                     </div>

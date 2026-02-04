@@ -58,46 +58,59 @@ export function AIAssistantFAB({ className }: AIAssistantFABProps) {
         setInput("");
         setIsLoading(true);
 
-        // Simulate AI response (replace with actual OpenAI API call)
-        setTimeout(() => {
+        try {
+            // Call the MES AI API
+            const token = localStorage.getItem("mes_token") || "";
+            const response = await fetch("http://localhost:3050/api/v1/ai/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    message: userMessage.content,
+                    device: "serra_01",
+                }),
+            });
+
+            let answer = "Desculpe, não consegui processar sua solicitação.";
+
+            if (response.ok) {
+                const data = await response.json();
+                answer = data.answer || answer;
+            } else if (response.status === 401) {
+                answer = "Sessão expirada. Por favor, faça login novamente.";
+            }
+
             const aiResponse: Message = {
                 id: `ai-${Date.now()}`,
                 role: "assistant",
-                content: getAIResponse(userMessage.content),
+                content: answer,
                 timestamp: new Date(),
             };
             setMessages((prev) => [...prev, aiResponse]);
+        } catch (error) {
+            console.error("AI API Error:", error);
+            const errorMessage: Message = {
+                id: `ai-${Date.now()}`,
+                role: "assistant",
+                content: "Erro de conexão com o servidor. Verifique se o backend está rodando.",
+                timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+        } finally {
             setIsLoading(false);
-        }, 1000);
+        }
     };
 
-    const getAIResponse = (query: string): string => {
-        const lowerQuery = query.toLowerCase();
 
-        if (lowerQuery.includes("oee") || lowerQuery.includes("eficiência")) {
-            return "O OEE (Overall Equipment Effectiveness) atual está em 78.5%. A disponibilidade está em 92%, a performance em 85% e a qualidade em 99.2%. Deseja ver detalhes por centro de trabalho?";
-        }
-        if (lowerQuery.includes("produção") || lowerQuery.includes("ordens")) {
-            return "Temos 12 ordens de produção ativas hoje. 3 estão em andamento, 5 aguardando início e 4 foram concluídas. Deseja ver detalhes de alguma ordem específica?";
-        }
-        if (lowerQuery.includes("parada") || lowerQuery.includes("downtime")) {
-            return "Nas últimas 24 horas, registramos 3 paradas não planejadas. A maior foi na CNC-01 por 45 minutos (manutenção corretiva). O MTTR médio está em 23 minutos.";
-        }
-        if (lowerQuery.includes("qualidade") || lowerQuery.includes("scrap")) {
-            return "A taxa de refugo atual é de 0.8%, abaixo da meta de 1.5%. Os principais motivos são: defeitos dimensionais (45%) e acabamento superficial (30%).";
-        }
-        if (lowerQuery.includes("digital twin") || lowerQuery.includes("iot")) {
-            return "O Digital Twin está conectado e recebendo telemetria de 5 dispositivos. A serra_01 está operando a 82°C com velocidade de 1200 RPM.";
-        }
-        return "Entendi sua pergunta. Posso ajudar com informações sobre OEE, produção, qualidade, paradas de máquina e o Digital Twin. O que você gostaria de saber?";
-    };
 
     return (
         <>
             {/* Floating Action Button */}
             <motion.button
                 onClick={() => setIsOpen(true)}
-                className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-2xl 
+                className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-2xl 
                            bg-gradient-to-br from-lime-400 to-emerald-600
                            shadow-[0_0_30px_rgba(173,255,47,0.4)]
                            flex items-center justify-center
@@ -133,7 +146,7 @@ export function AIAssistantFAB({ className }: AIAssistantFABProps) {
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        className="fixed bottom-6 left-6 z-50 w-96 h-[500px] 
+                        className="fixed bottom-6 right-6 z-50 w-96 h-[500px] 
                                    bg-gray-900 rounded-2xl overflow-hidden
                                    border border-lime-500/30
                                    shadow-[0_0_40px_rgba(173,255,47,0.2)]

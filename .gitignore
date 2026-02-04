@@ -10,12 +10,13 @@ build/
 *.tsbuildinfo
 
 # Environment variables
-.env
-.env.local
-.env.*.local
-credentials.json
-token.json
-
+*.env
+*.env.local
+*env.*.local
+*credentials.json
+*token.json
+*.env.bridge
+*setup_secrets.sh
 # Logs
 logs/
 *.log

@@ -78,4 +78,42 @@ export const logDebug = (message: string, meta?: Record<string, unknown>) => {
     logger.debug(message, meta);
 };
 
+// Service-specific logging helpers
+export const logExternalService = (
+    service: 'thingsboard' | 'grafana' | 'mqtt' | 'erp' | 'dt-postgres',
+    action: string,
+    meta?: Record<string, unknown>
+) => {
+    logger.info(`[${service.toUpperCase()}] ${action}`, { externalService: service, ...meta });
+};
+
+export const logExternalServiceError = (
+    service: 'thingsboard' | 'grafana' | 'mqtt' | 'erp' | 'dt-postgres',
+    action: string,
+    error?: Error,
+    meta?: Record<string, unknown>
+) => {
+    logger.error(`[${service.toUpperCase()}] ${action} failed`, {
+        externalService: service,
+        error: error?.message,
+        stack: error?.stack,
+        ...meta,
+    });
+};
+
+export const logDatabaseOperation = (
+    operation: 'query' | 'insert' | 'update' | 'delete',
+    table: string,
+    durationMs: number,
+    meta?: Record<string, unknown>
+) => {
+    logger.debug(`[DB] ${operation.toUpperCase()} ${table}`, {
+        dbOperation: operation,
+        table,
+        durationMs,
+        ...meta
+    });
+};
+
 export default logger;
+

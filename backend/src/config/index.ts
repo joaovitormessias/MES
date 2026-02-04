@@ -71,6 +71,10 @@ interface Config {
     openai: {
         apiKey: string;
     };
+    grafana: {
+        apiUrl: string;
+        apiKey: string;
+    };
 }
 
 const config: Config = {
@@ -141,6 +145,10 @@ const config: Config = {
     },
     openai: {
         apiKey: process.env.OPENAI_API_KEY || '',
+    },
+    grafana: {
+        apiUrl: process.env.GRAFANA_API_URL || 'http://localhost:3000',
+        apiKey: process.env.GRAFANA_API_KEY || '',
     },
 };
 
