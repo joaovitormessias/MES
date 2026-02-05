@@ -1,12 +1,10 @@
 "use client";
-"use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Card, CardBody, CardHeader, Button, Chip, Progress, Divider, Tabs, Tab } from "@heroui/react";
+import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardBody, CardHeader, Button, Chip, Divider, Tabs, Tab } from "@heroui/react";
 import {
     Activity,
-    Cpu,
     Thermometer,
     Gauge,
     Wifi,
@@ -14,105 +12,95 @@ import {
     RefreshCw,
     AlertTriangle,
     CheckCircle2,
-    Zap,
-    Factory
+    Factory,
+    TrendingUp,
+    ServerCrash
 } from "lucide-react";
 import { GrafanaSection } from "@/components/dashboard/GrafanaSection";
+import { Serra01StatusCard } from "@/components/digital-twin/Serra01StatusCard";
+import {
+    getStatus,
+    getHistory,
+    getAlerts,
+    checkHealth,
+    celsiusToKelvin,
+    Serra01FullStatus,
+    HistoryEntry,
+    HealthInfo
+} from "@/services/digital-twin.service";
 
-interface Device {
-    id: string;
-    name: string;
-    type: string;
-    isOnline: boolean;
-    lastSeenAt: string;
-    metrics: {
-        temperature?: number;
-        speed?: number;
-        pressure?: number;
-        vibration?: number;
-    };
-}
-
-interface Alert {
-    id: string;
-    deviceName: string;
-    type: string;
-    severity: "info" | "warning" | "critical";
-    message: string;
-    timestamp: string;
-}
-
-// Mock data for demonstration
-const mockDevices: Device[] = [
-    {
-        id: "1",
-        name: "Serra Principal",
-        type: "SIMULATOR",
-        isOnline: true,
-        lastSeenAt: new Date().toISOString(),
-        metrics: { temperature: 82, speed: 1200, pressure: 4.5, vibration: 0.8 },
-    },
-    {
-        id: "2",
-        name: "CNC-01",
-        type: "PLC",
-        isOnline: true,
-        lastSeenAt: new Date().toISOString(),
-        metrics: { temperature: 45, speed: 3500, pressure: 6.2, vibration: 0.3 },
-    },
-    {
-        id: "3",
-        name: "Prensa Hidráulica",
-        type: "SENSOR",
-        isOnline: false,
-        lastSeenAt: new Date(Date.now() - 3600000).toISOString(),
-        metrics: { temperature: 0, speed: 0, pressure: 0, vibration: 0 },
-    },
-    {
-        id: "4",
-        name: "Calibrador",
-        type: "GATEWAY",
-        isOnline: true,
-        lastSeenAt: new Date().toISOString(),
-        metrics: { temperature: 38, speed: 800, pressure: 3.1, vibration: 0.5 },
-    },
-];
-
-const mockAlerts: Alert[] = [
-    {
-        id: "1",
-        deviceName: "Serra Principal",
-        type: "TEMPERATURE_HIGH",
-        severity: "warning",
-        message: "Temperatura acima do normal: 82°C",
-        timestamp: new Date().toISOString(),
-    },
-    {
-        id: "2",
-        deviceName: "Prensa Hidráulica",
-        type: "DEVICE_OFFLINE",
-        severity: "critical",
-        message: "Dispositivo offline há 1 hora",
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-    },
-];
+// Animation variants for tab transitions
+const tabContentVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+    exit: { opacity: 0, y: -20, transition: { duration: 0.2, ease: "easeIn" } }
+};
 
 export default function DigitalTwinPage() {
-    const [devices, setDevices] = useState<Device[]>(mockDevices);
-    const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
+    const [status, setStatus] = useState<Serra01FullStatus | null>(null);
+    const [history, setHistory] = useState<HistoryEntry[]>([]);
+    const [alerts, setAlerts] = useState<HealthInfo | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [connectionStatus, setConnectionStatus] = useState<"connected" | "disconnected">("connected");
     const [selectedTab, setSelectedTab] = useState("visao");
+    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadData = useCallback(async () => {
+        try {
+            // First check if API is reachable
+            const health = await checkHealth();
+            setIsConnected(health);
+
+            if (!health) {
+                setError("API não está acessível. Verifique se o servidor Digital Twin está rodando.");
+                return;
+            }
+
+            // Fetch all data with individual error handling
+            const results = await Promise.allSettled([
+                getStatus('serra_01'),
+                getHistory('serra_01', 30),
+                getAlerts('serra_01')
+            ]);
+
+            // Process status
+            if (results[0].status === 'fulfilled') {
+                setStatus(results[0].value);
+            }
+
+            // Process history
+            if (results[1].status === 'fulfilled') {
+                setHistory(results[1].value);
+            }
+
+            // Process alerts
+            if (results[2].status === 'fulfilled') {
+                setAlerts(results[2].value);
+            }
+
+            setLastUpdate(new Date());
+            setError(null);
+        } catch (err) {
+            console.error('Failed to load Digital Twin data:', err);
+            setIsConnected(false);
+            setError("Falha ao carregar dados. Verifique a conexão com o servidor.");
+        }
+    }, []);
+
+    useEffect(() => {
+        loadData();
+        const interval = setInterval(loadData, 5000);
+        return () => clearInterval(interval);
+    }, [loadData]);
 
     const refreshData = async () => {
         setIsRefreshing(true);
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await loadData();
         setIsRefreshing(false);
     };
 
-    const onlineCount = devices.filter((d) => d.isOnline).length;
-    const offlineCount = devices.filter((d) => !d.isOnline).length;
+    const temperatureK = status ? celsiusToKelvin(status.temperature) : 0;
 
     const renderStatsCards = () => (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -121,14 +109,16 @@ export default function DigitalTwinPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
             >
-                <Card className="bg-gradient-to-br from-lime-50 to-emerald-50 border-lime-200">
-                    <CardBody className="flex flex-row items-center gap-4">
-                        <div className="p-3 bg-lime-500 rounded-xl">
-                            <Wifi className="w-6 h-6 text-white" />
+                <Card className="bg-gradient-to-br from-orange-100 to-amber-50 border-0 shadow-lg">
+                    <CardBody className="flex flex-row items-center gap-4 p-5">
+                        <div className="p-3 bg-orange-500 rounded-lg">
+                            <Thermometer className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <p className="text-2xl font-bold text-gray-900">{onlineCount}</p>
-                            <p className="text-sm text-gray-600">Dispositivos Online</p>
+                            <p className="text-3xl font-black text-gray-900">
+                                {temperatureK.toFixed(1)}<span className="text-lg font-normal ml-1">K</span>
+                            </p>
+                            <p className="text-sm text-gray-600">Temperatura</p>
                         </div>
                     </CardBody>
                 </Card>
@@ -139,14 +129,16 @@ export default function DigitalTwinPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
             >
-                <Card className="bg-gradient-to-br from-red-50 to-orange-50 border-red-200">
-                    <CardBody className="flex flex-row items-center gap-4">
-                        <div className="p-3 bg-red-500 rounded-xl">
-                            <WifiOff className="w-6 h-6 text-white" />
+                <Card className="bg-gradient-to-br from-teal-100 to-emerald-50 border-0 shadow-lg">
+                    <CardBody className="flex flex-row items-center gap-4 p-5">
+                        <div className="p-3 bg-teal-500 rounded-lg">
+                            <Gauge className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <p className="text-2xl font-bold text-gray-900">{offlineCount}</p>
-                            <p className="text-sm text-gray-600">Dispositivos Offline</p>
+                            <p className="text-3xl font-black text-gray-900">
+                                {status?.sawRpm?.toFixed(0) || 0}<span className="text-lg font-normal ml-1">rpm</span>
+                            </p>
+                            <p className="text-sm text-gray-600">Saw RPM</p>
                         </div>
                     </CardBody>
                 </Card>
@@ -157,14 +149,16 @@ export default function DigitalTwinPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
             >
-                <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200">
-                    <CardBody className="flex flex-row items-center gap-4">
-                        <div className="p-3 bg-amber-500 rounded-xl">
-                            <AlertTriangle className="w-6 h-6 text-white" />
+                <Card className="bg-gradient-to-br from-sky-100 to-blue-50 border-0 shadow-lg">
+                    <CardBody className="flex flex-row items-center gap-4 p-5">
+                        <div className="p-3 bg-sky-500 rounded-lg">
+                            <Activity className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                            <p className="text-2xl font-bold text-gray-900">{alerts.length}</p>
-                            <p className="text-sm text-gray-600">Alertas Ativos</p>
+                            <p className="text-3xl font-black text-gray-900">
+                                {status?.vibration?.toFixed(2) || 0}<span className="text-lg font-normal ml-1">mm/s</span>
+                            </p>
+                            <p className="text-sm text-gray-600">Vibração</p>
                         </div>
                     </CardBody>
                 </Card>
@@ -175,14 +169,24 @@ export default function DigitalTwinPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
             >
-                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-                    <CardBody className="flex flex-row items-center gap-4">
-                        <div className="p-3 bg-blue-500 rounded-xl">
-                            <Activity className="w-6 h-6 text-white" />
+                <Card className={`border-0 shadow-lg ${status?.status === 'RUNNING'
+                        ? 'bg-gradient-to-br from-emerald-100 to-green-50'
+                        : 'bg-gradient-to-br from-red-100 to-orange-50'
+                    }`}>
+                    <CardBody className="flex flex-row items-center gap-4 p-5">
+                        <div className={`p-3 rounded-lg ${status?.status === 'RUNNING' ? 'bg-emerald-500' : 'bg-red-500'
+                            }`}>
+                            {status?.status === 'RUNNING' ? (
+                                <Wifi className="w-6 h-6 text-white" />
+                            ) : (
+                                <WifiOff className="w-6 h-6 text-white" />
+                            )}
                         </div>
                         <div>
-                            <p className="text-2xl font-bold text-gray-900">{devices.length}</p>
-                            <p className="text-sm text-gray-600">Total Dispositivos</p>
+                            <p className="text-2xl font-black text-gray-900">
+                                {status?.status || 'OFFLINE'}
+                            </p>
+                            <p className="text-sm text-gray-600">Status</p>
                         </div>
                     </CardBody>
                 </Card>
@@ -190,170 +194,123 @@ export default function DigitalTwinPage() {
         </div>
     );
 
-    const renderDevices = () => (
-        <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">Dispositivos IoT</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {devices.map((device, index) => (
-                    <motion.div
-                        key={device.id}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.1 }}
-                    >
-                        <Card
-                            className={`transition-all hover:shadow-lg ${device.isOnline
-                                    ? "border-l-4 border-l-lime-500"
-                                    : "border-l-4 border-l-red-500 opacity-75"
-                                }`}
-                        >
-                            <CardHeader className="flex justify-between items-start pb-2">
-                                <div className="flex items-center gap-2">
-                                    <Cpu className={`w-5 h-5 ${device.isOnline ? "text-lime-600" : "text-red-500"}`} />
-                                    <span className="font-semibold text-gray-800">{device.name}</span>
-                                </div>
-                                <Chip
-                                    size="sm"
-                                    color={device.isOnline ? "success" : "danger"}
-                                    variant="flat"
-                                >
-                                    {device.isOnline ? "Online" : "Offline"}
-                                </Chip>
-                            </CardHeader>
-                            <Divider />
-                            <CardBody className="pt-3 space-y-3">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="flex items-center gap-2">
-                                        <Thermometer className="w-4 h-4 text-orange-500" />
-                                        <span className="text-sm text-gray-600">
-                                            {device.metrics.temperature || 0}°C
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Gauge className="w-4 h-4 text-blue-500" />
-                                        <span className="text-sm text-gray-600">
-                                            {device.metrics.speed || 0} RPM
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Zap className="w-4 h-4 text-purple-500" />
-                                        <span className="text-sm text-gray-600">
-                                            {device.metrics.pressure || 0} bar
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Activity className="w-4 h-4 text-emerald-500" />
-                                        <span className="text-sm text-gray-600">
-                                            {device.metrics.vibration || 0} mm/s
-                                        </span>
-                                    </div>
-                                </div>
-                                {device.isOnline && device.metrics.temperature && (
-                                    <div>
-                                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                            <span>Temperatura</span>
-                                            <span>{device.metrics.temperature}°C / 100°C</span>
-                                        </div>
-                                        <Progress
-                                            value={device.metrics.temperature}
-                                            maxValue={100}
-                                            color={device.metrics.temperature > 80 ? "warning" : "success"}
-                                            size="sm"
-                                        />
-                                    </div>
-                                )}
-                            </CardBody>
-                        </Card>
-                    </motion.div>
-                ))}
-            </div>
-        </div>
-    );
-
-    const renderAlerts = () => (
-        <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">Alertas IoT</h2>
-            <Card className="border-amber-200">
-                <CardBody className="space-y-3">
-                    {alerts.length === 0 ? (
-                        <div className="text-center py-6 text-gray-500">
-                            <CheckCircle2 className="w-12 h-12 mx-auto mb-2 text-green-500" />
-                            <p>Nenhum alerta ativo</p>
+    const renderHealthAlerts = () => (
+        <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    <span className="font-bold text-gray-800">Health Status</span>
+                </div>
+            </CardHeader>
+            <Divider />
+            <CardBody className="space-y-3">
+                {alerts?.health === 'OK' ? (
+                    <div className="text-center py-6 text-gray-500">
+                        <CheckCircle2 className="w-12 h-12 mx-auto mb-2 text-emerald-500" />
+                        <p className="font-medium">Sistema operando normalmente</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex items-center gap-2 mb-4">
+                            <Chip
+                                color={alerts?.health === 'CRITICAL' ? 'danger' : 'warning'}
+                                variant="flat"
+                            >
+                                {alerts?.health || 'UNKNOWN'}
+                            </Chip>
                         </div>
-                    ) : (
-                        alerts.map((alert, index) => (
+                        {alerts?.issues?.map((issue, idx) => (
                             <motion.div
-                                key={alert.id}
+                                key={idx}
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                className={`p-3 rounded-lg border-l-4 ${alert.severity === "critical"
-                                        ? "bg-red-50 border-l-red-500"
-                                        : alert.severity === "warning"
-                                            ? "bg-amber-50 border-l-amber-500"
-                                            : "bg-blue-50 border-l-blue-500"
+                                transition={{ delay: idx * 0.1 }}
+                                className={`p-3 rounded-lg border-l-4 ${alerts.health === 'CRITICAL'
+                                        ? 'bg-red-50 border-l-red-500'
+                                        : 'bg-amber-50 border-l-amber-500'
                                     }`}
                             >
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <p className="font-medium text-gray-800 text-sm">
-                                            {alert.deviceName}
-                                        </p>
-                                        <p className="text-xs text-gray-600 mt-1">
-                                            {alert.message}
-                                        </p>
-                                    </div>
-                                    <Chip
-                                        size="sm"
-                                        color={
-                                            alert.severity === "critical"
-                                                ? "danger"
-                                                : alert.severity === "warning"
-                                                    ? "warning"
-                                                    : "primary"
-                                        }
-                                        variant="flat"
-                                    >
-                                        {alert.severity}
-                                    </Chip>
-                                </div>
+                                <p className="text-sm text-gray-700">{issue}</p>
                             </motion.div>
-                        ))
-                    )}
-                </CardBody>
-            </Card>
+                        ))}
+                    </>
+                )}
+            </CardBody>
+        </Card>
+    );
 
-            <Card>
-                <CardHeader>
-                    <span className="font-semibold text-gray-800">Conexao ThingsBoard</span>
-                </CardHeader>
-                <Divider />
-                <CardBody className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                        <span className="text-gray-600">URL</span>
-                        <span className="font-mono text-gray-800">localhost:8080</span>
+    const renderHistoryTrend = () => (
+        <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-teal-500" />
+                    <span className="font-bold text-gray-800">Histórico Recente</span>
+                </div>
+            </CardHeader>
+            <Divider />
+            <CardBody>
+                {history.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">Sem dados de histórico</p>
+                ) : (
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-4 gap-2 text-xs font-medium text-gray-500 pb-2 border-b">
+                            <span>Hora</span>
+                            <span>Temp (K)</span>
+                            <span>RPM</span>
+                            <span>Status</span>
+                        </div>
+                        {history.slice(0, 10).map((entry, idx) => (
+                            <div key={idx} className="grid grid-cols-4 gap-2 text-sm py-1">
+                                <span className="text-gray-600">
+                                    {new Date(entry.ts * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span className="font-mono text-orange-600">
+                                    {celsiusToKelvin(entry.temperature).toFixed(1)}
+                                </span>
+                                <span className="font-mono text-teal-600">
+                                    {entry.sawRpm?.toFixed(0) || '-'}
+                                </span>
+                                <Chip size="sm" color={entry.status === 'RUNNING' ? 'success' : 'default'} variant="flat">
+                                    {entry.status}
+                                </Chip>
+                            </div>
+                        ))}
                     </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-600">Device</span>
-                        <span className="font-mono text-gray-800">serra_01</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-600">Poll Interval</span>
-                        <span className="font-mono text-gray-800">1.0s</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-600">Status</span>
-                        <Chip size="sm" color="success" variant="dot">
-                            Conectado
-                        </Chip>
-                    </div>
-                </CardBody>
-            </Card>
-        </div>
+                )}
+            </CardBody>
+        </Card>
+    );
+
+    const renderErrorState = () => (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center py-20"
+        >
+            <div className="p-6 bg-red-100 rounded-full mb-6">
+                <ServerCrash className="w-16 h-16 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Conexão Falhou</h2>
+            <p className="text-gray-500 mb-6 text-center max-w-md">{error}</p>
+            <div className="space-y-2 text-sm text-gray-600 bg-gray-100 p-4 rounded-lg mb-6">
+                <p>Para iniciar o servidor Digital Twin:</p>
+                <code className="block bg-gray-800 text-green-400 p-2 rounded font-mono text-xs">
+                    cd digital-twin && uvicorn backend.api.main:app --reload
+                </code>
+            </div>
+            <Button
+                color="primary"
+                onClick={refreshData}
+                isLoading={isRefreshing}
+                startContent={<RefreshCw className="w-4 h-4" />}
+            >
+                Tentar Novamente
+            </Button>
+        </motion.div>
     );
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
             {/* Header */}
             <motion.div
                 className="flex items-center justify-between"
@@ -361,21 +318,25 @@ export default function DigitalTwinPage() {
                 animate={{ opacity: 1, y: 0 }}
             >
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                        <Factory className="w-7 h-7 text-lime-600" />
+                    <h1 className="text-3xl font-black text-gray-900 flex items-center gap-3">
+                        <Factory className="w-8 h-8 text-teal-600" />
                         Digital Twin
                     </h1>
                     <p className="text-gray-500 mt-1">
-                        Visualização em tempo real dos dispositivos IoT
+                        Monitoramento em tempo real • <span className="font-mono">serra_01</span>
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <motion.div
+                        animate={{ scale: isConnected ? [1, 1.1, 1] : 1 }}
+                        transition={{ repeat: isConnected ? Infinity : 0, duration: 2 }}
+                        className={`w-3 h-3 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'}`}
+                    />
                     <Chip
-                        color={connectionStatus === "connected" ? "success" : "danger"}
-                        variant="dot"
-                        className="gap-1"
+                        color={isConnected ? "success" : "danger"}
+                        variant="flat"
                     >
-                        ThingsBoard {connectionStatus === "connected" ? "Conectado" : "Desconectado"}
+                        {isConnected ? "API Conectada" : "Desconectado"}
                     </Chip>
                     <Button
                         variant="bordered"
@@ -389,33 +350,117 @@ export default function DigitalTwinPage() {
             </motion.div>
 
             <Tabs
-                aria-label="Secoes do Digital Twin"
+                aria-label="Seções do Digital Twin"
                 selectedKey={selectedTab}
                 onSelectionChange={(key) => setSelectedTab(key as string)}
                 color="primary"
                 variant="underlined"
+                classNames={{
+                    tabList: "gap-6",
+                    tab: "px-0 h-12 transition-all duration-200",
+                    cursor: "bg-teal-500"
+                }}
             >
-                <Tab key="visao" title="Visao Geral" />
+                <Tab key="visao" title="Visão Geral" />
                 <Tab key="dispositivos" title="Dispositivos IoT" />
                 <Tab key="alertas" title="Alertas IoT" />
                 <Tab key="grafana" title="Grafana" />
             </Tabs>
 
-            {selectedTab === "visao" && (
-                <>
-                    {renderStatsCards()}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2">{renderDevices()}</div>
-                        <div>{renderAlerts()}</div>
-                    </div>
-                </>
+            {/* Error State */}
+            {error && !isConnected && renderErrorState()}
+
+            {/* Tab Content with Smooth Transitions */}
+            {(!error || isConnected) && (
+                <AnimatePresence mode="wait">
+                    {selectedTab === "visao" && (
+                        <motion.div
+                            key="visao"
+                            variants={tabContentVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                            className="space-y-6"
+                        >
+                            {renderStatsCards()}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="lg:col-span-2">
+                                    <Serra01StatusCard onDataUpdate={setStatus} />
+                                </div>
+                                <div className="space-y-6">
+                                    {renderHealthAlerts()}
+                                    {renderHistoryTrend()}
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {selectedTab === "dispositivos" && (
+                        <motion.div
+                            key="dispositivos"
+                            variants={tabContentVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                            className="text-center py-12"
+                        >
+                            <p className="text-gray-500">Veja a página dedicada de dispositivos IoT</p>
+                            <Button
+                                as="a"
+                                href="/digital-twin/devices"
+                                color="primary"
+                                className="mt-4"
+                            >
+                                Ir para Dispositivos
+                            </Button>
+                        </motion.div>
+                    )}
+
+                    {selectedTab === "alertas" && (
+                        <motion.div
+                            key="alertas"
+                            variants={tabContentVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                            className="text-center py-12"
+                        >
+                            <p className="text-gray-500">Veja a página dedicada de alertas IoT</p>
+                            <Button
+                                as="a"
+                                href="/digital-twin/alerts"
+                                color="primary"
+                                className="mt-4"
+                            >
+                                Ir para Alertas
+                            </Button>
+                        </motion.div>
+                    )}
+
+                    {selectedTab === "grafana" && (
+                        <motion.div
+                            key="grafana"
+                            variants={tabContentVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                        >
+                            <GrafanaSection />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             )}
 
-            {selectedTab === "dispositivos" && renderDevices()}
-
-            {selectedTab === "alertas" && renderAlerts()}
-
-            {selectedTab === "grafana" && <GrafanaSection />}
+            {/* Last Update Footer */}
+            {lastUpdate && isConnected && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center text-xs text-gray-400"
+                >
+                    Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+                </motion.div>
+            )}
         </div>
     );
 }
