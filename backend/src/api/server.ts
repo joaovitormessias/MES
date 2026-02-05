@@ -12,6 +12,7 @@ import { requestLogger } from './middleware/logging.middleware';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { getRedisClient, closeRedis } from '../utils/idempotency';
 import { disconnectPrisma } from '../utils/prisma';
+import { startTelemetryBridge, stopTelemetryBridge } from '../services/telemetry-bridge.service';
 import routes from './routes';
 
 const app: Application = express();
@@ -108,6 +109,14 @@ const server = httpServer.listen(config.server.port, async () => {
     } catch (error) {
         logError('Failed to connect to Redis', error as Error);
     }
+
+    // Start telemetry bridge
+    try {
+        startTelemetryBridge();
+        logInfo('Telemetry bridge started');
+    } catch (error) {
+        logError('Failed to start telemetry bridge', error as Error);
+    }
 });
 
 // Graceful shutdown
@@ -118,6 +127,7 @@ const gracefulShutdown = async (signal: string) => {
         logInfo('HTTP server closed');
 
         try {
+            stopTelemetryBridge();
             await closeRedis();
             await disconnectPrisma();
             logInfo('All connections closed');

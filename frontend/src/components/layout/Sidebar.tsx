@@ -119,7 +119,14 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                         )}
                         <div className="sidebar-nav">
                             {section.items.map((item, itemIndex) => {
-                                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                                // For parent routes that have children (like /digital-twin), use exact match only
+                                const allItems = navigation.flatMap(s => s.items);
+                                const hasChildren = allItems.some(i =>
+                                    i.href !== item.href && i.href.startsWith(item.href + "/")
+                                );
+                                const isActive = hasChildren
+                                    ? pathname === item.href
+                                    : pathname === item.href || pathname.startsWith(item.href + "/");
                                 return (
                                     <motion.div
                                         key={item.href}
