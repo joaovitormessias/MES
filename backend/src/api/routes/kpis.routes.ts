@@ -58,7 +58,7 @@ router.get(
  * GET /api/v1/kpis/mttr
  * Mean Time To Repair
  */
-router.get('/mttr', authenticateToken, async (req, res, next) => {
+router.get('/mttr', authenticateToken, async (_req, res, next) => {
     try {
         // TODO: Implement MTTR calculation
         res.json({ message: 'MTTR endpoint - to be implemented' });
@@ -71,7 +71,7 @@ router.get('/mttr', authenticateToken, async (req, res, next) => {
  * GET /api/v1/kpis/mtbf
  * Mean Time Between Failures
  */
-router.get('/mtbf', authenticateToken, async (req, res, next) => {
+router.get('/mtbf', authenticateToken, async (_req, res, next) => {
     try {
         // TODO: Implement MTBF calculation
         res.json({ message: 'MTBF endpoint - to be implemented' });

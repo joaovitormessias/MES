@@ -1,292 +1,115 @@
-# MES RENAR Backend
+# Manufacturing Execution System
 
-Manufacturing Execution System (MES) backend for RENAR - A production-grade system for real-time manufacturing execution, quality management, OEE tracking, and complete traceability.
+**Track production steps, piece counts, quality events and shift effectiveness in one manufacturing domain model.**
 
-## 🎯 Features
+A portfolio prototype exploring the boundary between production planning and shop-floor execution, with TypeScript, Express, Prisma, PostgreSQL, Redis and Socket.IO. A separate Next.js interface and industrial integration experiments live in the same repository.
 
-- **Production Order Management**: Import from ERP, track execution, automatic replenishment
-- **Real-time Execution**: Barcode scanning, process step tracking, piece counting
-- **Quality Management**: Scrap vs reuse classification with reason codes
-- **OEE Calculation**: Availability × Performance × Quality with shift-based tracking
-- **Complete Traceability**: Lot genealogy and execution timeline
-- **Real-time Events**: WebSocket-based updates for dashboards
-- **ISA-95 Inspired**: Layered architecture separating ERP (Level 4) from execution (Level 3)
+[Product scope](#product-scope) · [Code walkthrough](#code-walkthrough) · [Local setup](#local-backend-setup) · [Verification](#verification) · [Limitations](#limitations)
 
-## 🏗️ Architecture
+> **Status:** development prototype, not a production-grade MES. Several API routes are placeholders. No live factory deployment, completed ERP integration or end-to-end equipment demonstration is claimed.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         API Layer                            │
-│  REST API + WebSocket + Authentication + Validation          │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                      Domain Services                         │
-│  Production Orders │ Execution │ Quality │ OEE │ Traceability│
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                    Integration Layer                         │
-│        ERP Adapter │ Equipment Adapters │ Event Bus          │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                   Data & Infrastructure                      │
-│         PostgreSQL │ Redis │ Prisma ORM │ Metrics            │
-└─────────────────────────────────────────────────────────────┘
-```
+## Product scope
 
-## 🚀 Quick Start
+The intended workflow is: select a production order, start a process step, record counts and quality events, then inspect traceability and shift OEE. The repository models that workflow through services and relational entities; it does not implement every feature described in planning documents.
 
-### Prerequisites
+| Area | Current implementation |
+| --- | --- |
+| Production orders and execution | Domain services and REST routes for process operations |
+| Quality | Scrap/reuse handling in the quality service |
+| OEE | Availability × performance × quality, shift calculation and snapshots |
+| Traceability | Lot/order query routes backed by Prisma relations |
+| Events and infrastructure | Redis event bus, idempotency utilities, metrics and Socket.IO wiring |
+| Industrial data | ThingsBoard adapter, telemetry routes and bridge experiments; live integration unverified |
+| Dashboards, approvals, MTTR and MTBF | Several routes return explicit “to be implemented” responses |
+| ERP jobs | Configuration/planning exists; no executable ERP sync job is shipped |
 
-- Node.js 20+
-- Docker & Docker Compose
-- npm or yarn
+## Code walkthrough
 
-### Installation
+| Engineering concern | Entry point | Review focus |
+| --- | --- | --- |
+| Consistent production state | [Execution service](backend/src/domain/execution/execution.service.ts) | State transitions and recorded quantities |
+| Shift calculations | [OEE service](backend/src/domain/oee/oee.service.ts) | Overnight boundaries, clipped downtime and overlap merging |
+| Relational model | [Prisma schema](backend/prisma/schema.prisma) | Orders, steps, operators, lots and telemetry |
+| Request boundaries | [Route modules](backend/src/api/routes) | Implemented operations versus placeholders |
+| Identity and roles | [Authentication routes](backend/src/api/routes/auth.routes.ts) | Demo registration guard and badge-based login limitations |
+| Delivery and duplication | [Event bus](backend/src/events/event-bus.ts) and [idempotency utility](backend/src/utils/idempotency.ts) | Redis dependency and failure semantics |
+| Verification | [OEE tests](backend/src/domain/oee/oee.service.test.ts) | Formula and shift-boundary regression cases with a mocked database |
 
-1. **Clone and install dependencies**:
+Backend domain services share one PostgreSQL database. Redis supports event delivery and duplicate-request handling. Device adapters are integration boundaries, not proof that a physical production line has been connected.
+
+## Local backend setup
+
+Use Node.js 20+ and npm 10+, PostgreSQL and Redis. Commands run from the repository root unless shown otherwise.
+
 ```bash
-cd /home/user/Work/MER
+git clone https://github.com/joaovitormessias/MES.git
+cd MES
+docker compose up -d mes-postgres mes-redis
+cd backend
 npm install
-```
-
-2. **Set up environment**:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-3. **Start infrastructure** (PostgreSQL + Redis):
-```bash
-docker-compose up -d
-```
-
-4. **Run database migrations**:
-```bash
-npm run prisma:migrate
 npm run prisma:generate
 ```
 
-5. **Start development server**:
+Start only those two Compose services for the backend walkthrough. The full Compose file references a separate `digital-twin/` checkout that is not included. Its default credentials are for local development only; do not expose the database/Redis ports publicly.
+
+Create `backend/.env` with local values:
+
+```dotenv
+NODE_ENV=development
+PORT=3050
+DATABASE_URL=postgresql://mes_user:mes_password@localhost:5433/mes_renar
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=replace-with-a-long-random-local-secret
+CORS_ORIGIN=http://localhost:3001
+```
+
+For a **new disposable local database**, create the schema and start the API:
+
 ```bash
+npx prisma db push
 npm run dev
 ```
 
-The API will be available at `http://localhost:3000`
+This is a local prototype setup, not a production migration procedure. The current repository does not provide a dependable committed migration history. Production orders/workcenters/steps must be populated before their operations can be demonstrated; empty tables do not constitute a working production flow.
 
-### Health Check
-
-```bash
-curl http://localhost:3000/health
-```
-
-## 📚 API Documentation
-
-### Base URL
-```
-http://localhost:3000/api/v1
-```
-
-### Authentication
-All endpoints require JWT authentication. Include the token in the Authorization header:
-```
-Authorization: Bearer <your-jwt-token>
-```
-
-### Key Endpoints
-
-#### Production Orders
-- `GET /ops` - Search/filter production orders
-- `GET /ops/:id` - Get order details
-- `POST /ops/:id/steps/:stepId/start` - Start process step
-- `POST /ops/:id/steps/:stepId/count` - Record piece count
-- `POST /ops/:id/steps/:stepId/quality` - Record quality event
-- `POST /ops/:id/steps/:stepId/complete` - Complete step
-
-#### Barcode Scanning
-- `POST /scans` - Ingest barcode scan (idempotent)
-
-#### Traceability
-- `GET /traceability/lots/:lotId` - Lot timeline and genealogy
-- `GET /traceability/ops/:opId` - Production order execution timeline
-
-#### KPIs
-- `GET /kpis/oee` - OEE drill-down (real-time or historical)
-- `GET /kpis/mttr` - Mean Time To Repair
-- `GET /kpis/mtbf` - Mean Time Between Failures
-
-#### Dashboards
-- `GET /dashboards/shift` - Shift plan vs actual
-- `GET /dashboards/microstops` - Micro-stop analysis
-- `GET /dashboards/quality` - Quality breakdown
-- `GET /dashboards/table-utilization` - Table utilization metrics
-
-## 🔧 Development
-
-### Project Structure
-
-```
-src/
-├── api/                    # API layer
-│   ├── middleware/         # Auth, validation, error handling
-│   ├── routes/             # REST endpoints
-│   └── server.ts           # Express server
-├── domain/                 # Business logic
-│   ├── production-order/   # OP management
-│   ├── execution/          # Step execution
-│   ├── quality/            # Quality management
-│   ├── oee/                # OEE calculation
-│   └── ...
-├── integrations/           # External systems
-│   ├── erp/                # ERP adapters
-│   └── equipment/          # Equipment adapters
-├── events/                 # Event bus
-├── utils/                  # Utilities
-│   ├── logger.ts           # Winston logger
-│   ├── metrics.ts          # Prometheus metrics
-│   ├── idempotency.ts      # Redis-backed idempotency
-│   └── prisma.ts           # Prisma client
-└── config/                 # Configuration
-```
-
-### Running Tests
+Check HTTP responsiveness:
 
 ```bash
-# All tests
-npm test
-
-# With coverage
-npm run test:coverage
-
-# Integration tests only
-npm run test:integration
-
-# Watch mode
-npm run test:watch
+curl http://localhost:3050/health
 ```
 
-### Database Management
+In development, `POST /api/v1/auth/register` accepts `badge` and `name` to provision a demo operator. Login uses `POST /api/v1/auth/login` with that badge and returns a bearer token. Registration returns HTTP 403 in production; **badge-only login still is not production authentication**. Protect the environment accordingly.
+
+### Frontend and optional integrations
+
+`frontend/` is a separate Next.js application with Supabase/API configuration in [its client modules](frontend/src/lib). It is not started by the backend commands. Its generated [frontend README](frontend/README.md) covers the development server, but backend/Supabase alignment and a complete browser demo still need validation.
+
+The [digital twin project](https://github.com/joaovitormessias/digital-twin-for-a-timber-company) is a separate repository. ThingsBoard, Grafana and AI routes need additional credentials and infrastructure; they are not prerequisites for isolated OEE tests.
+
+## Verification
+
+From `backend/`:
 
 ```bash
-# Create new migration
-npm run prisma:migrate
-
-# Open Prisma Studio (GUI)
-npm run prisma:studio
-
-# Generate Prisma client
 npm run prisma:generate
+npm run build
+npm test -- --runInBand
 ```
 
-### Background Jobs
+The backend has its own TypeScript output directory (`backend/dist`) and Jest configuration. `npm start` runs the compiled `dist/api/server.js` after a successful build.
 
-```bash
-# Manual ERP sync
-npm run job:erp-sync
+The backend build and seven tests passed. The review covers the standard OEE formula, missing schedules, overnight shifts, overlapping downtime, zero-duration rejection and production demo-registration denial. Prisma is mocked in domain tests; Docker, live PostgreSQL/Redis, factory equipment, frontend acceptance and external APIs were not exercised. Build/test results do not imply production readiness.
 
-# Manual OEE calculation
-npm run job:oee-calc
-```
+## Limitations
 
-## 📊 Monitoring
+- Authentication is a demo badge lookup. Some integration routes lack application authorization, and default secrets/credentials must be replaced before any shared environment.
+- Shift times use the server timezone; choose it deliberately. Site-specific calendars, DST policy, partial-shift reporting and executions spanning shifts require further domain decisions.
+- OEE uses execution start time to select production and defaults missing ideal cycle time to one minute. Validate this convention with production data before interpreting results.
+- Dashboards, approvals, MTTR/MTBF and ERP jobs are incomplete. Removed npm job commands previously pointed to files that do not exist.
+- Dependencies are not locked in this repository. Database migrations and operational recovery need a separate implementation and verification effort.
 
-### Metrics Endpoint
-Prometheus metrics available at:
-```
-http://localhost:9090/metrics
-```
+Next milestones: implement password/identity-based authentication and consistent authorization, establish migrations and seed fixtures, complete the placeholder routes, then record an end-to-end synthetic production walkthrough.
 
-### Key Metrics
-- `http_request_duration_seconds` - Request latency
-- `execution_events_total` - Event counts by type
-- `piece_count_total` - Pieces counted by workcenter
-- `oee_current` - Current OEE value
-- `quality_events_total` - Quality events by disposition
+## License and maintainer
 
-### Logs
-Structured JSON logs in `./logs/`:
-- `combined.log` - All logs
-- `error.log` - Errors only
-
-## 🔐 Security
-
-- JWT-based authentication
-- Role-based authorization (OPERATOR, SUPERVISOR, PCP, MANAGER)
-- Rate limiting (100 req/min per IP)
-- Helmet.js security headers
-- CORS configuration
-- Input validation with Zod
-
-## 🏭 Production Deployment
-
-### Environment Variables
-See `.env.example` for all required variables.
-
-### Docker Build
-```bash
-docker build -t mes-renar-backend .
-```
-
-### Database Migrations
-Always run migrations before deploying:
-```bash
-npm run prisma:migrate
-```
-
-### Health Checks
-Configure your load balancer to use:
-```
-GET /health
-```
-
-## 📖 Domain Events
-
-The system publishes the following domain events (via Redis pub/sub):
-
-- `OP_IMPORTED_FROM_ERP` - Production order imported
-- `BARCODE_SCANNED` - Barcode scan processed
-- `STEP_STARTED` - Process step started
-- `PIECE_COUNTED` - Pieces counted
-- `QUALITY_RECORDED` - Quality event recorded
-- `REPLENISHMENT_OP_CREATED` - Replenishment order created
-- `STEP_COMPLETED` - Process step completed
-
-## 🔗 Integrations
-
-### ERP Integration
-Configure in `.env`:
-```env
-ERP_TYPE=rest  # or 'database'
-ERP_API_URL=http://erp.renar.local/api
-ERP_API_KEY=your-api-key
-```
-
-### Equipment Integration
-- **Optimizer**: Database polling (SQL Server/MySQL/PostgreSQL)
-- **CNC**: OPC UA, Modbus, or database
-- **Conveyors**: PLC signals via OPC UA or REST
-- **Presses/Calibrator/Brush**: Sensor data via MQTT or REST
-
-See `docs/integrations.md` for detailed setup.
-
-## 🤝 Contributing
-
-1. Follow TypeScript best practices
-2. Write tests for new features
-3. Update documentation
-4. Run linter: `npm run lint`
-5. Format code: `npm run format`
-
-## 📄 License
-
-UNLICENSED - Proprietary software for RENAR
-
-## 🆘 Support
-
-For issues or questions, contact the development team.
-
----
-
-**Built with**: Node.js, TypeScript, Express, PostgreSQL, Redis, Prisma, Socket.io
+The backend package declares `UNLICENSED`; this README grants no additional license. Maintained by [João Vitor Messias da Cruz Damasio](https://github.com/joaovitormessias).

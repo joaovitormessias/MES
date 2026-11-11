@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { validateParams, validateQuery } from '../middleware/validation.middleware';
+import { validateParams } from '../middleware/validation.middleware';
 import { authenticateToken } from '../middleware/auth.middleware';
 import prisma from '../../utils/prisma';
 import { AppError } from '../middleware/error.middleware';

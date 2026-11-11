@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../../utils/prisma';
@@ -92,7 +93,8 @@ router.post('/devices', async (req, res) => {
                 deviceType: data.deviceType,
                 thingsBoardId: data.thingsBoardId,
                 accessToken: data.accessToken,
-                metadata: data.metadata,
+                // Metadata originates from the JSON request body and has been checked as an object.
+                metadata: data.metadata as Prisma.InputJsonObject | undefined,
             },
         });
 

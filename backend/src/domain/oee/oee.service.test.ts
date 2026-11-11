@@ -12,7 +12,7 @@ describe('OEEService', () => {
     const oeeService = new OEEService();
 
     it('should calculate OEE correctly for a standard shift', async () => {
-        const mockDate = new Date('2026-01-15T12:00:00Z');
+        const mockDate = new Date(2026, 0, 15, 12);
         const workcenterId = 'WC01';
         const shiftNumber = 1;
 
@@ -32,8 +32,8 @@ describe('OEEService', () => {
             {
                 id: 'd1',
                 workcenterId,
-                startTs: new Date('2026-01-15T09:00:00Z'),
-                endTs: new Date('2026-01-15T09:30:00Z'),
+                startTs: new Date(2026, 0, 15, 9),
+                endTs: new Date(2026, 0, 15, 9, 30),
                 isMicroStop: false,
                 reasonCode: 'BREAKDOWN',
             },
@@ -86,5 +86,37 @@ describe('OEEService', () => {
             date: new Date(),
             shiftNumber: 1,
         })).rejects.toThrow('No active shift schedule found');
+    });
+});
+
+describe('OEE shift boundaries', () => {
+    const service = new OEEService();
+    const localDate = new Date(2026, 0, 15, 12);
+    function shift(startTime: string, endTime: string) {
+        prismaMock.shiftSchedule.findUnique.mockResolvedValue({startTime, endTime, isActive: true} as any);
+        prismaMock.processExecution.findMany.mockResolvedValue([]);
+        prismaMock.downtimeEvent.findMany.mockResolvedValue([]);
+    }
+    it('handles an overnight shift', async () => {
+        shift('22:00', '06:00');
+        const result = await service.calculateOEE({workcenterId:'WC01', date:localDate, shiftNumber:1});
+        expect(result.details.plannedTime).toBe(480);
+        expect(result.availability).toBe(1);
+    });
+    it('clips and merges overlapping downtime', async () => {
+        shift('08:00', '16:00');
+        prismaMock.downtimeEvent.findMany.mockResolvedValue([
+            {startTs:new Date(2026,0,15,7),endTs:new Date(2026,0,15,9)},
+            {startTs:new Date(2026,0,15,8,30),endTs:new Date(2026,0,15,10)},
+            {startTs:new Date(2026,0,15,15),endTs:new Date(2026,0,15,17)},
+        ] as any);
+        const result = await service.calculateOEE({workcenterId:'WC01', date:localDate, shiftNumber:1});
+        expect(result.details.downtime).toBe(180);
+        expect(result.availability).toBe(300/480);
+        expect(prismaMock.downtimeEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({OR:expect.any(Array)})}));
+    });
+    it('rejects an ambiguous zero-length shift', async () => {
+        shift('08:00','08:00');
+        await expect(service.calculateOEE({workcenterId:'WC01', date:localDate, shiftNumber:1})).rejects.toThrow('positive duration');
     });
 });
