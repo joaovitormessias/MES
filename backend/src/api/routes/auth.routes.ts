@@ -88,7 +88,14 @@ router.get('/me', authenticateToken, (req: Request, res: Response) => {
  * POST /api/v1/auth/register
  * Create a new operator (for testing/development)
  */
-router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+// Demo provisioning is intentionally unavailable in production.
+router.post('/register', (_req: Request, res: Response, next: NextFunction) => {
+    if (process.env.NODE_ENV === 'production') {
+        res.status(403).json({ error: 'FORBIDDEN', message: 'Demo registration is disabled' });
+        return;
+    }
+    next();
+}, async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { badge, name, role = 'OPERATOR' } = req.body;
 

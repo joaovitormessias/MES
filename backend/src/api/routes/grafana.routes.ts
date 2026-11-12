@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { Router } from 'express';
 import config from '../../config';
 import { logExternalService, logExternalServiceError } from '../../utils/logger';
@@ -36,7 +37,8 @@ router.get('/dashboards', async (_req, res, next) => {
             });
         }
 
-        const dashboards = await response.json();
+        // Validate upstream shapes before reading fields; preserve other Grafana properties.
+        const dashboards = z.array(z.object({}).passthrough()).parse(await response.json());
         logExternalService('grafana', 'Dashboards fetched successfully', {
             count: dashboards.length,
             durationMs
@@ -81,7 +83,7 @@ router.get('/dashboards/:uid', async (req, res, next) => {
             });
         }
 
-        const dashboardData = await response.json();
+        const dashboardData = z.object({ dashboard: z.object({ title: z.string().optional() }).passthrough() }).passthrough().parse(await response.json());
         logExternalService('grafana', 'Dashboard fetched successfully', {
             uid,
             durationMs,

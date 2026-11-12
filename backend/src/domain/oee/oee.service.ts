@@ -57,7 +57,6 @@ export class OEEService {
             // Calculate planned time (in minutes)
             const [startHour, startMin] = shiftSchedule.startTime.split(':').map(Number);
             const [endHour, endMin] = shiftSchedule.endTime.split(':').map(Number);
-            const plannedTime = (endHour * 60 + endMin) - (startHour * 60 + startMin);
 
             // Get downtime for this shift
             const shiftStart = new Date(date);
@@ -65,22 +64,31 @@ export class OEEService {
             const shiftEnd = new Date(date);
             shiftEnd.setHours(endHour, endMin, 0, 0);
 
+            // A shift ending before its start crosses midnight in the server timezone.
+            if (shiftEnd < shiftStart) shiftEnd.setDate(shiftEnd.getDate() + 1);
+            const plannedTime = (shiftEnd.getTime() - shiftStart.getTime()) / 60000;
+            if (plannedTime <= 0) throw new Error('Shift must have a positive duration');
+
             const downtimeEvents = await prisma.downtimeEvent.findMany({
                 where: {
                     workcenterId,
-                    startTs: {
-                        gte: shiftStart,
-                        lte: shiftEnd,
-                    },
+                    startTs: { lt: shiftEnd },
+                    OR: [{ endTs: { gt: shiftStart } }, { endTs: null }],
                 },
             });
 
-            const totalDowntime = downtimeEvents.reduce((sum: number, event: any) => {
-                const start = event.startTs;
-                const end = event.endTs || new Date();
-                const duration = (end.getTime() - start.getTime()) / (1000 * 60); // minutes
-                return sum + duration;
-            }, 0);
+            // Clip to the shift and merge overlaps so the same stopped minute is counted once.
+            const now = Date.now();
+            const intervals = downtimeEvents.map(event => [
+                Math.max(event.startTs.getTime(), shiftStart.getTime()),
+                Math.min(event.endTs?.getTime() ?? now, shiftEnd.getTime()),
+            ]).filter(([start, end]) => end > start).sort((a, b) => a[0] - b[0]);
+            let totalDowntime = 0;
+            let previousEnd = shiftStart.getTime();
+            for (const [start, end] of intervals) {
+                totalDowntime += Math.max(0, end - Math.max(start, previousEnd)) / 60000;
+                previousEnd = Math.max(previousEnd, end);
+            }
 
             // AVAILABILITY = (Planned Time - Downtime) / Planned Time
             const operatingTime = plannedTime - totalDowntime;
@@ -92,7 +100,7 @@ export class OEEService {
                     workcenterId,
                     startedAt: {
                         gte: shiftStart,
-                        lte: shiftEnd,
+                        lt: shiftEnd,
                     },
                 },
                 include: {

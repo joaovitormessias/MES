@@ -15,8 +15,6 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "job:erp-sync": "tsx src/jobs/erp-sync.job.ts",
-    "job:oee-calc": "tsx src/jobs/oee-calculation.job.ts",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\""
   },
